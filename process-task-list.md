@@ -73,8 +73,8 @@ When working with task lists, the AI must:
   - [x] Build skills CRUD UI
   - [x] Add user-skill assignment UI with levels
 - [ ] Queues Management
-  - [ ] Build queues CRUD UI
-  - [ ] Add queue-skill requirements configuration
+  - [x] Build queues CRUD UI
+  - [x] Add queue-skill requirements configuration
   - [ ] Add SLA configuration fields (first_response, resolution)
   - [ ] Add priority policy configuration
 - [ ] Handoff Policies Management
@@ -295,3 +295,7 @@ When working with task lists, the AI must:
 - `Shovel/app/Http/Controllers/Admin/UserController::syncSkills()` – User-skill sync endpoint with level support (1-5)
 - `Shovel/resources/js/pages/admin/users/index.tsx` – Enhanced users UI with role checkboxes in create/edit dialogs and skills management dialog with Award button
 - `Shovel/resources/js/pages/admin/skills/index.tsx` – Skills management UI with table, search, and CRUD dialogs for name and description
+- `Shovel/app/Http/Controllers/Admin/QueueController.php` – Queues CRUD API controller with search, pagination, default queue management, and skill requirements
+- `Shovel/app/Http/Resources/QueueResource.php` – Queue API resource for consistent JSON responses
+- `Shovel/resources/js/pages/admin/queues/index.tsx` – Queues management UI with table, search, CRUD dialogs, default queue indicator, and skill requirements checkboxes
+- `Shovel/tests/Feature/QueueCrudTest.php` – Comprehensive test suite for queues CRUD operations (9 tests)

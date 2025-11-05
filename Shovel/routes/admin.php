@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\QueueController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SkillController;
 use App\Http\Controllers\Admin\UserController;
@@ -80,6 +81,16 @@ Route::middleware([
     Route::get('/queues', function () {
         return Inertia::render('admin/queues/index');
     })->name('queues.index');
+
+    // Queues API endpoints
+    Route::prefix('api/queues')->name('api.queues.')->group(function () {
+        Route::get('/', [QueueController::class, 'index'])->name('index');
+        Route::get('/all', [QueueController::class, 'all'])->name('all');
+        Route::post('/', [QueueController::class, 'store'])->name('store');
+        Route::get('/{queue}', [QueueController::class, 'show'])->name('show');
+        Route::put('/{queue}', [QueueController::class, 'update'])->name('update');
+        Route::delete('/{queue}', [QueueController::class, 'destroy'])->name('destroy');
+    });
 
     // Handoff Policies Management
     Route::get('/handoff-policies', function () {

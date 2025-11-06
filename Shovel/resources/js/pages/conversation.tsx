@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import ConversationRoutes from '@/actions/App/Http/Controllers/ConversationController';
 import { inbox } from '@/routes';
-import { type BreadcrumbItem, type ConversationAssignment, type ConversationDetail, type ConversationHandoff, type ConversationMessage, type ConversationQueueItem, type SharedData } from '@/types';
+import { type BreadcrumbItem, type ConversationAssignment, type ConversationAuditEvent, type ConversationDetail, type ConversationHandoff, type ConversationMessage, type ConversationQueueItem, type SharedData } from '@/types';
 import Api from '@/actions/App/Http/Controllers/Api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -18,11 +18,12 @@ interface PageProps extends SharedData {
     queueItems: ConversationQueueItem[];
     assignments: ConversationAssignment[];
     handoffs: ConversationHandoff[];
+    auditEvents: ConversationAuditEvent[];
 }
 
 export default function ConversationPage() {
     const page = usePage<PageProps>();
-    const { conversation, messages, queueItems, assignments, handoffs } = page.props;
+    const { conversation, messages, queueItems, assignments, handoffs, auditEvents } = page.props;
     const agentToken = useAgentAuthToken();
     const authenticatedUserId = page.props.auth?.user?.id ?? null;
     const defaultActorId = authenticatedUserId ? String(authenticatedUserId) : '';
@@ -74,7 +75,7 @@ export default function ConversationPage() {
 
     const refreshConversation = useCallback(async () => {
         await router.reload({
-            only: ['conversation', 'messages', 'queueItems', 'assignments', 'handoffs'],
+            only: ['conversation', 'messages', 'queueItems', 'assignments', 'handoffs', 'auditEvents'],
         });
     }, []);
 
@@ -273,6 +274,55 @@ export default function ConversationPage() {
                                                 <span>Accepted: {assignment.accepted_at ? new Date(assignment.accepted_at).toLocaleString() : '—'}</span>
                                                 <span>Resolved: {assignment.resolved_at ? new Date(assignment.resolved_at).toLocaleString() : '—'}</span>
                                             </div>
+                                            {assignment.user && (
+                                                <>
+                                                    {assignment.user.roles.length > 0 && (
+                                                        <div className="mt-2">
+                                                            <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Roles:</p>
+                                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                                {assignment.user.roles.map((role) => (
+                                                                    <span
+                                                                        key={role.id}
+                                                                        className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                                                    >
+                                                                        {role.name}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {assignment.user.skills.length > 0 && (
+                                                        <div className="mt-2">
+                                                            <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Skills:</p>
+                                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                                {assignment.user.skills.map((skill) => (
+                                                                    <span
+                                                                        key={skill.id}
+                                                                        className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                                                    >
+                                                                        {skill.name}{skill.level ? ` (${skill.level})` : ''}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {assignment.user.queues.length > 0 && (
+                                                        <div className="mt-2">
+                                                            <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Queues:</p>
+                                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                                {assignment.user.queues.map((queue) => (
+                                                                    <span
+                                                                        key={queue.id}
+                                                                        className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                                                                    >
+                                                                        {queue.name}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
                                         </li>
                                     ))}
                                 </ul>
@@ -329,6 +379,48 @@ export default function ConversationPage() {
                                                         null,
                                                         2,
                                                     )}
+                                                </pre>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </section>
+
+                        <section className="rounded-xl border border-sidebar-border/70 bg-background p-4 dark:border-sidebar-border">
+                            <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Audit Trail</h3>
+                            {auditEvents.length === 0 ? (
+                                <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">No audit events recorded.</p>
+                            ) : (
+                                <ul className="mt-2 space-y-3 text-sm text-neutral-700 dark:text-neutral-300">
+                                    {auditEvents.map((event) => (
+                                        <li key={event.id} className="rounded-lg bg-neutral-100 p-3 dark:bg-neutral-900">
+                                            <div className="flex items-start justify-between">
+                                                <p className="font-medium text-neutral-800 dark:text-neutral-100">
+                                                    {event.event_type.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                                                </p>
+                                                <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                                    {event.occurred_at ? new Date(event.occurred_at).toLocaleString() : '—'}
+                                                </span>
+                                            </div>
+                                            {event.user && (
+                                                <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                                                    By: {event.user.name}
+                                                </p>
+                                            )}
+                                            {event.subject && (
+                                                <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                                                    Subject: {event.subject.type.split('\\').pop()} #{event.subject.id}
+                                                </p>
+                                            )}
+                                            {event.channel && (
+                                                <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                                                    Channel: {event.channel}
+                                                </p>
+                                            )}
+                                            {event.payload && Object.keys(event.payload).length > 0 && (
+                                                <pre className="mt-2 overflow-x-auto rounded bg-neutral-100 p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+                                                    {JSON.stringify(event.payload, null, 2)}
                                                 </pre>
                                             )}
                                         </li>

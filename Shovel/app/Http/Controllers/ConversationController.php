@@ -19,9 +19,18 @@ class ConversationController extends Controller
                 ->with('queue:id,name')
                 ->orderByDesc('created_at'),
             'assignments' => fn ($query) => $query
-                ->with(['user:id,name', 'queue:id,name'])
+                ->with([
+                    'user:id,name,email',
+                    'user.roles:id,name,slug',
+                    'user.skills:id,name',
+                    'user.queues:id,name',
+                    'queue:id,name',
+                ])
                 ->orderByDesc('assigned_at'),
             'handoffs' => fn ($query) => $query->orderByDesc('created_at'),
+            'auditEvents' => fn ($query) => $query
+                ->with(['user:id,name'])
+                ->orderByDesc('occurred_at'),
         ]);
 
         $conversationData = [
@@ -79,6 +88,21 @@ class ConversationController extends Controller
                     'user' => $assignment->user ? [
                         'id' => $assignment->user->id,
                         'name' => $assignment->user->name,
+                        'email' => $assignment->user->email,
+                        'roles' => $assignment->user->roles->map(fn ($role) => [
+                            'id' => $role->id,
+                            'name' => $role->name,
+                            'slug' => $role->slug,
+                        ])->values(),
+                        'skills' => $assignment->user->skills->map(fn ($skill) => [
+                            'id' => $skill->id,
+                            'name' => $skill->name,
+                            'level' => $skill->pivot->level ?? null,
+                        ])->values(),
+                        'queues' => $assignment->user->queues->map(fn ($queue) => [
+                            'id' => $queue->id,
+                            'name' => $queue->name,
+                        ])->values(),
                     ] : null,
                     'queue' => $assignment->queue ? [
                         'id' => $assignment->queue->id,
@@ -95,6 +119,28 @@ class ConversationController extends Controller
                     'required_skills' => $handoff->required_skills,
                     'metadata' => $handoff->metadata,
                     'created_at' => optional($handoff->created_at)->toIso8601String(),
+                ];
+            })->values(),
+            'auditEvents' => $conversation->auditEvents->map(function ($event) {
+                $subjectData = null;
+                if ($event->subject_type && $event->subject_id) {
+                    $subjectData = [
+                        'type' => $event->subject_type,
+                        'id' => $event->subject_id,
+                    ];
+                }
+                
+                return [
+                    'id' => $event->id,
+                    'event_type' => $event->event_type,
+                    'payload' => $event->payload,
+                    'channel' => $event->channel,
+                    'occurred_at' => optional($event->occurred_at)->toIso8601String(),
+                    'user' => $event->user ? [
+                        'id' => $event->user->id,
+                        'name' => $event->user->name,
+                    ] : null,
+                    'subject' => $subjectData,
                 ];
             })->values(),
         ]);

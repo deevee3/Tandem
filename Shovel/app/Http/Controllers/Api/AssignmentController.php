@@ -49,7 +49,7 @@ class AssignmentController extends Controller
                 'channel' => 'api',
             ]);
 
-            return $lockedAssignment->fresh();
+            return $lockedAssignment->fresh(['user.roles', 'user.skills', 'queue']);
         });
 
         return AssignmentResource::make($accepted)
@@ -97,7 +97,7 @@ class AssignmentController extends Controller
                 $lockedAssignment->save();
             }
 
-            return $lockedAssignment->fresh();
+            return $lockedAssignment->fresh(['user.roles', 'user.skills', 'queue']);
         });
 
         return AssignmentResource::make($released)
@@ -149,7 +149,7 @@ class AssignmentController extends Controller
             ]);
             $lockedAssignment->save();
 
-            return $lockedAssignment->fresh();
+            return $lockedAssignment->fresh(['user.roles', 'user.skills', 'queue']);
         });
 
         return AssignmentResource::make($resolved)

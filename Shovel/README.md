@@ -32,8 +32,8 @@ Shovel is a Laravel 11 application delivering the "Handshake" user experience: A
 | FR-8 SLA management | Not started | Timers, breach alerts, and UI indicators unimplemented |
 | FR-9 Audit & compliance | Not started | Audit export endpoints and UI missing |
 | FR-10 Analytics | Not started | Reporting queries + charts not yet built |
-| FR-11 Admin settings | Not started | Need thresholds, webhooks, policy pack management |
-| FR-12 API/webhooks | Not started | Subscription dispatch pipeline TBD |
+| **FR-11 Admin settings** | In progress | Users/roles, skills, queues, and webhooks management UIs live; thresholds & policy packs pending |
+| FR-12 API/webhooks | In progress | Admin webhook management UI complete; dispatch pipeline TBD |
 | FR-15 Policy packs & redaction | Not started | Regex storage and masking pipeline absent |
 | Observability (NFR) | Not started | Lacks health endpoint, metrics, log rotation |
 
@@ -68,4 +68,5 @@ Shovel is a Laravel 11 application delivering the "Handshake" user experience: A
 - Before running new servers, kill existing related processes (per project rules).
 
 ## Change log scaffold
+- **2025-11-06:** Added admin webhooks management UI details and updated feature coverage.
 - **2025-11-04:** Initial README created from PRD to track stack, status, and roadmap.

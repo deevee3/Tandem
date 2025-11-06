@@ -79,9 +79,23 @@ When working with task lists, the AI must:
   - [ ] Add priority policy configuration
 - [ ] Handoff Policies Management
   - [ ] Build handoff policies CRUD UI
+    - [ ] Audit existing `HandoffPolicy`/`HandoffPolicyRule` models, migrations, and seeders for required fields and relationships.
+    - [x] Implement admin controller, routes, and JSON resources for list/create/update/delete with form request validation.
+    - [x] Create Inertia page with table view, create/edit dialogs, active toggle, and metadata display consistent with other admin pages.
+    - [x] Add feature tests covering authorization, validation errors, and CRUD flows.
   - [ ] Add policy rules editor (triggers, criteria, priority)
+    - [ ] Support trigger types (confidence_below_threshold, policy_flag_detected, tool_error, agent_requested_handoff) with trigger-specific criteria inputs.
+    - [ ] Provide UI for priority ordering, enable/disable toggles, and inline validation feedback.
+    - [ ] Persist rule collections through dedicated controller endpoints and sync logic on the policy model.
+    - [ ] Extend `PolicyEvaluationService` tests to confirm rule evaluation honors new criteria and priority metadata.
   - [ ] Add policy-skill assignment UI
+    - [ ] Reuse queues skill selector component to avoid duplication and ensure consistent UX.
+    - [ ] Persist skill assignments via pivot sync in controller and expose them in API resource payloads.
+    - [ ] Add regression tests verifying policy-required skills appear in UI and feed routing decisions.
   - [ ] Add threshold configuration
+    - [ ] Capture per-policy confidence thresholds with numeric validation and sensible defaults.
+    - [ ] Expose threshold inputs and policy metadata summary in the admin UI.
+    - [ ] Ensure evaluation logic and seed data respect editable thresholds; update seeders if necessary.
 - [ ] API Keys Management
   - [ ] Build API keys listing UI
   - [ ] Add create/revoke API key UI

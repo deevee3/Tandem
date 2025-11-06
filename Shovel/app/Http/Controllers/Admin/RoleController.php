@@ -89,7 +89,7 @@ class RoleController extends Controller
             'slug' => $validated['slug'] ?? Str::slug($validated['name']),
             'description' => $validated['description'] ?? null,
             'guard_name' => $validated['guard_name'] ?? Role::defaultGuardName(),
-            'hourly_rate' => $validated['hourly_rate'] ?? null,
+            'hourly_rate' => !empty($validated['hourly_rate']) ? $validated['hourly_rate'] : null,
         ]);
 
         if (isset($validated['permission_ids'])) {
@@ -141,7 +141,7 @@ class RoleController extends Controller
             $role->slug = $validated['slug'];
         }
 
-        if (isset($validated['guard_name'])) {
+        if (isset($validated['guard_name']) && $validated['guard_name'] !== '') {
             $role->guard_name = $validated['guard_name'];
         }
 
@@ -149,8 +149,8 @@ class RoleController extends Controller
             $role->description = $validated['description'];
         }
 
-        if (isset($validated['hourly_rate'])) {
-            $role->hourly_rate = $validated['hourly_rate'];
+        if (array_key_exists('hourly_rate', $validated)) {
+            $role->hourly_rate = $validated['hourly_rate'] !== '' ? $validated['hourly_rate'] : null;
         }
 
         $role->save();

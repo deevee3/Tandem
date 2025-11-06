@@ -36,6 +36,8 @@ class QueueCrudTest extends TestCase
                         'slug',
                         'description',
                         'is_default',
+                        'sla_first_response_minutes',
+                        'sla_resolution_minutes',
                         'skills_required',
                         'priority_policy',
                         'created_at',
@@ -204,5 +206,218 @@ class QueueCrudTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['slug']);
+    }
+
+    public function test_it_creates_queue_with_sla_configuration(): void
+    {
+        $queueData = [
+            'name' => 'SLA Queue',
+            'sla_first_response_minutes' => 30,
+            'sla_resolution_minutes' => 240,
+        ];
+
+        $response = $this->actingAs($this->user)
+            ->postJson('/admin/api/queues', $queueData);
+
+        $response->assertStatus(201)
+            ->assertJsonFragment([
+                'name' => 'SLA Queue',
+                'sla_first_response_minutes' => 30,
+                'sla_resolution_minutes' => 240,
+            ]);
+
+        $this->assertDatabaseHas('queues', [
+            'name' => 'SLA Queue',
+            'sla_first_response_minutes' => 30,
+            'sla_resolution_minutes' => 240,
+        ]);
+    }
+
+    public function test_it_creates_queue_with_default_sla_values(): void
+    {
+        $queueData = [
+            'name' => 'Default SLA Queue',
+        ];
+
+        $response = $this->actingAs($this->user)
+            ->postJson('/admin/api/queues', $queueData);
+
+        $response->assertStatus(201)
+            ->assertJsonFragment([
+                'sla_first_response_minutes' => 15,
+                'sla_resolution_minutes' => 120,
+            ]);
+    }
+
+    public function test_it_creates_queue_with_priority_policy(): void
+    {
+        $queueData = [
+            'name' => 'Priority Queue',
+            'priority_policy' => [
+                'urgent_threshold_minutes' => 20,
+                'high_threshold_minutes' => 45,
+                'auto_escalate' => true,
+            ],
+        ];
+
+        $response = $this->actingAs($this->user)
+            ->postJson('/admin/api/queues', $queueData);
+
+        $response->assertStatus(201);
+
+        $queue = Queue::where('name', 'Priority Queue')->first();
+        $this->assertNotNull($queue->priority_policy);
+        $this->assertEquals(20, $queue->priority_policy['urgent_threshold_minutes']);
+        $this->assertEquals(45, $queue->priority_policy['high_threshold_minutes']);
+        $this->assertTrue($queue->priority_policy['auto_escalate']);
+    }
+
+    public function test_it_updates_queue_sla_configuration(): void
+    {
+        $queue = Queue::factory()->create([
+            'sla_first_response_minutes' => 15,
+            'sla_resolution_minutes' => 120,
+        ]);
+
+        $updateData = [
+            'sla_first_response_minutes' => 45,
+            'sla_resolution_minutes' => 300,
+        ];
+
+        $response = $this->actingAs($this->user)
+            ->putJson("/admin/api/queues/{$queue->id}", $updateData);
+
+        $response->assertStatus(200)
+            ->assertJsonFragment([
+                'sla_first_response_minutes' => 45,
+                'sla_resolution_minutes' => 300,
+            ]);
+
+        $this->assertDatabaseHas('queues', [
+            'id' => $queue->id,
+            'sla_first_response_minutes' => 45,
+            'sla_resolution_minutes' => 300,
+        ]);
+    }
+
+    public function test_it_validates_sla_minutes_are_positive(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->postJson('/admin/api/queues', [
+                'name' => 'Invalid SLA Queue',
+                'sla_first_response_minutes' => 0,
+                'sla_resolution_minutes' => -10,
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['sla_first_response_minutes', 'sla_resolution_minutes']);
+    }
+
+    public function test_it_assigns_users_to_queue(): void
+    {
+        $queue = Queue::factory()->create();
+        $users = User::factory()->count(3)->create();
+
+        $response = $this->actingAs($this->user)
+            ->postJson("/admin/api/queues/{$queue->id}/users", [
+                'user_ids' => $users->pluck('id')->toArray(),
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Users assigned successfully',
+            ]);
+
+        $this->assertCount(3, $queue->fresh()->users);
+        foreach ($users as $user) {
+            $this->assertTrue($queue->users->contains($user));
+        }
+    }
+
+    public function test_it_syncs_users_replacing_existing_assignments(): void
+    {
+        $queue = Queue::factory()->create();
+        $oldUsers = User::factory()->count(2)->create();
+        $newUsers = User::factory()->count(2)->create();
+
+        $queue->users()->attach($oldUsers->pluck('id'));
+
+        $response = $this->actingAs($this->user)
+            ->postJson("/admin/api/queues/{$queue->id}/users", [
+                'user_ids' => $newUsers->pluck('id')->toArray(),
+            ]);
+
+        $response->assertStatus(200);
+
+        $queue->refresh();
+        $this->assertCount(2, $queue->users);
+        foreach ($newUsers as $user) {
+            $this->assertTrue($queue->users->contains($user));
+        }
+        foreach ($oldUsers as $user) {
+            $this->assertFalse($queue->users->contains($user));
+        }
+    }
+
+    public function test_it_unassigns_user_from_queue(): void
+    {
+        $queue = Queue::factory()->create();
+        $users = User::factory()->count(3)->create();
+        $queue->users()->attach($users->pluck('id'));
+
+        $userToRemove = $users->first();
+
+        $response = $this->actingAs($this->user)
+            ->deleteJson("/admin/api/queues/{$queue->id}/users/{$userToRemove->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'User unassigned successfully',
+            ]);
+
+        $queue->refresh();
+        $this->assertCount(2, $queue->users);
+        $this->assertFalse($queue->users->contains($userToRemove));
+    }
+
+    public function test_it_validates_user_ids_when_assigning(): void
+    {
+        $queue = Queue::factory()->create();
+
+        $response = $this->actingAs($this->user)
+            ->postJson("/admin/api/queues/{$queue->id}/users", [
+                'user_ids' => [999, 1000], // Non-existent user IDs
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['user_ids.0', 'user_ids.1']);
+    }
+
+    public function test_it_includes_users_in_queue_list(): void
+    {
+        $queue = Queue::factory()->create();
+        $users = User::factory()->count(2)->create();
+        $queue->users()->attach($users->pluck('id'));
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/admin/api/queues');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    '*' => [
+                        'id',
+                        'name',
+                        'users' => [
+                            '*' => [
+                                'id',
+                                'name',
+                                'email',
+                                'username',
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
     }
 }

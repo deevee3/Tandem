@@ -38,16 +38,19 @@ interface User {
     email_verified_at?: string;
     created_at: string;
     updated_at: string;
+    total_hourly_rate?: number;
     roles?: Array<{
         id: number;
         name: string;
         slug: string;
+        hourly_rate?: number;
     }>;
     skills?: Array<{
         id: number;
         name: string;
         slug: string;
         level?: number;
+        hourly_rate?: number;
     }>;
 }
 
@@ -338,6 +341,7 @@ export default function UsersIndex() {
                                         <TableHead>Email</TableHead>
                                         <TableHead>Roles</TableHead>
                                         <TableHead>Skills</TableHead>
+                                        <TableHead>Hourly Rate</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -374,6 +378,13 @@ export default function UsersIndex() {
                                                         <Badge variant="outline">+{user.skills.length - 3}</Badge>
                                                     )}
                                                 </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {user.total_hourly_rate !== undefined ? (
+                                                    <span className="font-medium">${user.total_hourly_rate.toFixed(2)}/hr</span>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-sm">N/A</span>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-2">

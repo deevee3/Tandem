@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Edit, Plus, Search, Trash2, List, Star } from 'lucide-react';
+import { Edit, Plus, Search, Trash2, List, Star, Clock, TrendingUp, Users } from 'lucide-react';
 import axios from 'axios';
 import { dashboard } from '@/routes';
 
@@ -36,16 +36,33 @@ interface Skill {
     description?: string;
 }
 
+interface User {
+    id: number;
+    name: string;
+    email: string;
+    username: string;
+    avatar?: string;
+}
+
 interface Queue {
     id: number;
     name: string;
     slug: string;
     description?: string;
     is_default: boolean;
+    sla_first_response_minutes: number;
+    sla_resolution_minutes: number;
     skills_required?: number[];
-    priority_policy?: Record<string, any>;
+    priority_policy?: PriorityPolicy;
+    users?: User[];
     created_at: string;
     updated_at: string;
+}
+
+interface PriorityPolicy {
+    urgent_threshold_minutes?: number;
+    high_threshold_minutes?: number;
+    auto_escalate?: boolean;
 }
 
 interface PaginationMeta {
@@ -58,6 +75,7 @@ interface PaginationMeta {
 export default function QueuesIndex() {
     const [queues, setQueues] = useState<Queue[]>([]);
     const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
+    const [availableUsers, setAvailableUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [pagination, setPagination] = useState<PaginationMeta>({
@@ -70,14 +88,32 @@ export default function QueuesIndex() {
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isManageUsersDialogOpen, setIsManageUsersDialogOpen] = useState(false);
     const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
+    const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
 
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{
+        name: string;
+        slug: string;
+        description: string;
+        is_default: boolean;
+        sla_first_response_minutes: number;
+        sla_resolution_minutes: number;
+        skills_required: number[];
+        priority_policy: PriorityPolicy;
+    }>({
         name: '',
         slug: '',
         description: '',
         is_default: false,
-        skills_required: [] as number[],
+        sla_first_response_minutes: 15,
+        sla_resolution_minutes: 120,
+        skills_required: [],
+        priority_policy: {
+            urgent_threshold_minutes: 30,
+            high_threshold_minutes: 60,
+            auto_escalate: false,
+        },
     });
 
     const [formErrors, setFormErrors] = useState<Record<string, string[]>>({});
@@ -111,9 +147,19 @@ export default function QueuesIndex() {
         }
     }, []);
 
+    const fetchUsers = useCallback(async () => {
+        try {
+            const response = await axios.get('/admin/api/users', { params: { per_page: 1000 } });
+            setAvailableUsers(response.data.data || []);
+        } catch (error) {
+            console.error('Failed to fetch users:', error);
+        }
+    }, []);
+
     useEffect(() => {
         fetchQueues(1, search);
         fetchSkills();
+        fetchUsers();
     }, []);
 
     const handleSearch = () => {
@@ -131,7 +177,20 @@ export default function QueuesIndex() {
         try {
             await axios.post('/admin/api/queues', formData);
             setIsCreateDialogOpen(false);
-            setFormData({ name: '', slug: '', description: '', is_default: false, skills_required: [] });
+            setFormData({ 
+                name: '', 
+                slug: '', 
+                description: '', 
+                is_default: false, 
+                sla_first_response_minutes: 15,
+                sla_resolution_minutes: 120,
+                skills_required: [],
+                priority_policy: {
+                    urgent_threshold_minutes: 30,
+                    high_threshold_minutes: 60,
+                    auto_escalate: false,
+                },
+            });
             fetchQueues(pagination.current_page, search);
         } catch (error: any) {
             if (error.response?.data?.errors) {
@@ -148,7 +207,20 @@ export default function QueuesIndex() {
             await axios.put(`/admin/api/queues/${selectedQueue.id}`, formData);
             setIsEditDialogOpen(false);
             setSelectedQueue(null);
-            setFormData({ name: '', slug: '', description: '', is_default: false, skills_required: [] });
+            setFormData({ 
+                name: '', 
+                slug: '', 
+                description: '', 
+                is_default: false, 
+                sla_first_response_minutes: 15,
+                sla_resolution_minutes: 120,
+                skills_required: [],
+                priority_policy: {
+                    urgent_threshold_minutes: 30,
+                    high_threshold_minutes: 60,
+                    auto_escalate: false,
+                },
+            });
             fetchQueues(pagination.current_page, search);
         } catch (error: any) {
             if (error.response?.data?.errors) {
@@ -183,7 +255,20 @@ export default function QueuesIndex() {
     };
 
     const openCreateDialog = () => {
-        setFormData({ name: '', slug: '', description: '', is_default: false, skills_required: [] });
+        setFormData({ 
+            name: '', 
+            slug: '', 
+            description: '', 
+            is_default: false, 
+            sla_first_response_minutes: 15,
+            sla_resolution_minutes: 120,
+            skills_required: [],
+            priority_policy: {
+                urgent_threshold_minutes: 30,
+                high_threshold_minutes: 60,
+                auto_escalate: false,
+            },
+        });
         setFormErrors({});
         setIsCreateDialogOpen(true);
     };
@@ -195,7 +280,14 @@ export default function QueuesIndex() {
             slug: queue.slug,
             description: queue.description || '',
             is_default: queue.is_default,
+            sla_first_response_minutes: queue.sla_first_response_minutes || 15,
+            sla_resolution_minutes: queue.sla_resolution_minutes || 120,
             skills_required: queue.skills_required || [],
+            priority_policy: queue.priority_policy || {
+                urgent_threshold_minutes: 30,
+                high_threshold_minutes: 60,
+                auto_escalate: false,
+            },
         });
         setFormErrors({});
         setIsEditDialogOpen(true);
@@ -204,6 +296,36 @@ export default function QueuesIndex() {
     const openDeleteDialog = (queue: Queue) => {
         setSelectedQueue(queue);
         setIsDeleteDialogOpen(true);
+    };
+
+    const openManageUsersDialog = (queue: Queue) => {
+        setSelectedQueue(queue);
+        setSelectedUserIds(queue.users?.map(u => u.id) || []);
+        setIsManageUsersDialogOpen(true);
+    };
+
+    const handleUserToggle = (userId: number, checked: boolean) => {
+        if (checked) {
+            setSelectedUserIds([...selectedUserIds, userId]);
+        } else {
+            setSelectedUserIds(selectedUserIds.filter(id => id !== userId));
+        }
+    };
+
+    const handleAssignUsers = async () => {
+        if (!selectedQueue) return;
+
+        try {
+            await axios.post(`/admin/api/queues/${selectedQueue.id}/users`, {
+                user_ids: selectedUserIds,
+            });
+            setIsManageUsersDialogOpen(false);
+            setSelectedQueue(null);
+            setSelectedUserIds([]);
+            fetchQueues(pagination.current_page, search);
+        } catch (error: any) {
+            console.error('Failed to assign users:', error);
+        }
     };
 
     const getSkillNames = (skillIds?: number[]) => {
@@ -264,6 +386,7 @@ export default function QueuesIndex() {
                                         <TableHead>Name</TableHead>
                                         <TableHead>Slug</TableHead>
                                         <TableHead>Default</TableHead>
+                                        <TableHead>Assigned Users</TableHead>
                                         <TableHead>Skills Required</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -286,6 +409,37 @@ export default function QueuesIndex() {
                                                     ) : (
                                                         <span className="text-muted-foreground text-sm">-</span>
                                                     )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {queue.users && queue.users.length > 0 ? (
+                                                                <>
+                                                                    {queue.users.slice(0, 2).map((user) => (
+                                                                        <Badge key={user.id} variant="outline">
+                                                                            {user.name}
+                                                                        </Badge>
+                                                                    ))}
+                                                                    {queue.users.length > 2 && (
+                                                                        <Badge variant="outline">
+                                                                            +{queue.users.length - 2}
+                                                                        </Badge>
+                                                                    )}
+                                                                </>
+                                                            ) : (
+                                                                <span className="text-muted-foreground text-sm">
+                                                                    No users assigned
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => openManageUsersDialog(queue)}
+                                                        >
+                                                            <Users className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-wrap gap-1">
@@ -433,6 +587,116 @@ export default function QueuesIndex() {
                                 The default queue will be used for new conversations unless specified otherwise
                             </p>
                         </div>
+                        
+                        {/* SLA Configuration */}
+                        <div className="grid gap-4 border rounded-lg p-4 bg-muted/50">
+                            <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                <Label className="text-base font-semibold">SLA Configuration</Label>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="create-sla-first-response">First Response (minutes)</Label>
+                                    <Input
+                                        id="create-sla-first-response"
+                                        type="number"
+                                        min="1"
+                                        value={formData.sla_first_response_minutes}
+                                        onChange={(e) => setFormData({ ...formData, sla_first_response_minutes: parseInt(e.target.value) || 15 })}
+                                        placeholder="15"
+                                    />
+                                    {formErrors.sla_first_response_minutes && (
+                                        <p className="text-sm text-destructive">{formErrors.sla_first_response_minutes[0]}</p>
+                                    )}
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="create-sla-resolution">Resolution (minutes)</Label>
+                                    <Input
+                                        id="create-sla-resolution"
+                                        type="number"
+                                        min="1"
+                                        value={formData.sla_resolution_minutes}
+                                        onChange={(e) => setFormData({ ...formData, sla_resolution_minutes: parseInt(e.target.value) || 120 })}
+                                        placeholder="120"
+                                    />
+                                    {formErrors.sla_resolution_minutes && (
+                                        <p className="text-sm text-destructive">{formErrors.sla_resolution_minutes[0]}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Define target response and resolution times for conversations in this queue
+                            </p>
+                        </div>
+
+                        {/* Priority Policy Configuration */}
+                        <div className="grid gap-4 border rounded-lg p-4 bg-muted/50">
+                            <div className="flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                                <Label className="text-base font-semibold">Priority Policy</Label>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="create-urgent-threshold">Urgent Threshold (minutes)</Label>
+                                    <Input
+                                        id="create-urgent-threshold"
+                                        type="number"
+                                        min="1"
+                                        value={formData.priority_policy.urgent_threshold_minutes || ''}
+                                        onChange={(e) => setFormData({ 
+                                            ...formData, 
+                                            priority_policy: { 
+                                                ...formData.priority_policy, 
+                                                urgent_threshold_minutes: parseInt(e.target.value) || undefined 
+                                            } 
+                                        })}
+                                        placeholder="30"
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="create-high-threshold">High Threshold (minutes)</Label>
+                                    <Input
+                                        id="create-high-threshold"
+                                        type="number"
+                                        min="1"
+                                        value={formData.priority_policy.high_threshold_minutes || ''}
+                                        onChange={(e) => setFormData({ 
+                                            ...formData, 
+                                            priority_policy: { 
+                                                ...formData.priority_policy, 
+                                                high_threshold_minutes: parseInt(e.target.value) || undefined 
+                                            } 
+                                        })}
+                                        placeholder="60"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Checkbox
+                                    id="create-auto-escalate"
+                                    checked={formData.priority_policy.auto_escalate || false}
+                                    onCheckedChange={(checked) =>
+                                        setFormData({ 
+                                            ...formData, 
+                                            priority_policy: { 
+                                                ...formData.priority_policy, 
+                                                auto_escalate: checked as boolean 
+                                            } 
+                                        })
+                                    }
+                                />
+                                <label
+                                    htmlFor="create-auto-escalate"
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                >
+                                    Enable auto-escalation
+                                </label>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Configure priority thresholds and automatic escalation rules
+                            </p>
+                        </div>
+
                         <div className="grid gap-2">
                             <Label>Skills Required</Label>
                             <div className="border rounded-md p-4 max-h-60 overflow-y-auto">
@@ -544,6 +808,116 @@ export default function QueuesIndex() {
                                 The default queue will be used for new conversations unless specified otherwise
                             </p>
                         </div>
+                        
+                        {/* SLA Configuration */}
+                        <div className="grid gap-4 border rounded-lg p-4 bg-muted/50">
+                            <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                <Label className="text-base font-semibold">SLA Configuration</Label>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="edit-sla-first-response">First Response (minutes)</Label>
+                                    <Input
+                                        id="edit-sla-first-response"
+                                        type="number"
+                                        min="1"
+                                        value={formData.sla_first_response_minutes}
+                                        onChange={(e) => setFormData({ ...formData, sla_first_response_minutes: parseInt(e.target.value) || 15 })}
+                                        placeholder="15"
+                                    />
+                                    {formErrors.sla_first_response_minutes && (
+                                        <p className="text-sm text-destructive">{formErrors.sla_first_response_minutes[0]}</p>
+                                    )}
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="edit-sla-resolution">Resolution (minutes)</Label>
+                                    <Input
+                                        id="edit-sla-resolution"
+                                        type="number"
+                                        min="1"
+                                        value={formData.sla_resolution_minutes}
+                                        onChange={(e) => setFormData({ ...formData, sla_resolution_minutes: parseInt(e.target.value) || 120 })}
+                                        placeholder="120"
+                                    />
+                                    {formErrors.sla_resolution_minutes && (
+                                        <p className="text-sm text-destructive">{formErrors.sla_resolution_minutes[0]}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Define target response and resolution times for conversations in this queue
+                            </p>
+                        </div>
+
+                        {/* Priority Policy Configuration */}
+                        <div className="grid gap-4 border rounded-lg p-4 bg-muted/50">
+                            <div className="flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                                <Label className="text-base font-semibold">Priority Policy</Label>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="edit-urgent-threshold">Urgent Threshold (minutes)</Label>
+                                    <Input
+                                        id="edit-urgent-threshold"
+                                        type="number"
+                                        min="1"
+                                        value={formData.priority_policy.urgent_threshold_minutes || ''}
+                                        onChange={(e) => setFormData({ 
+                                            ...formData, 
+                                            priority_policy: { 
+                                                ...formData.priority_policy, 
+                                                urgent_threshold_minutes: parseInt(e.target.value) || undefined 
+                                            } 
+                                        })}
+                                        placeholder="30"
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="edit-high-threshold">High Threshold (minutes)</Label>
+                                    <Input
+                                        id="edit-high-threshold"
+                                        type="number"
+                                        min="1"
+                                        value={formData.priority_policy.high_threshold_minutes || ''}
+                                        onChange={(e) => setFormData({ 
+                                            ...formData, 
+                                            priority_policy: { 
+                                                ...formData.priority_policy, 
+                                                high_threshold_minutes: parseInt(e.target.value) || undefined 
+                                            } 
+                                        })}
+                                        placeholder="60"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Checkbox
+                                    id="edit-auto-escalate"
+                                    checked={formData.priority_policy.auto_escalate || false}
+                                    onCheckedChange={(checked) =>
+                                        setFormData({ 
+                                            ...formData, 
+                                            priority_policy: { 
+                                                ...formData.priority_policy, 
+                                                auto_escalate: checked as boolean 
+                                            } 
+                                        })
+                                    }
+                                />
+                                <label
+                                    htmlFor="edit-auto-escalate"
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                >
+                                    Enable auto-escalation
+                                </label>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Configure priority thresholds and automatic escalation rules
+                            </p>
+                        </div>
+
                         <div className="grid gap-2">
                             <Label>Skills Required</Label>
                             <div className="border rounded-md p-4 max-h-60 overflow-y-auto">
@@ -607,6 +981,66 @@ export default function QueuesIndex() {
                         <Button variant="destructive" onClick={handleDeleteQueue}>
                             Delete Queue
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Manage Users Dialog */}
+            <Dialog open={isManageUsersDialogOpen} onOpenChange={setIsManageUsersDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Manage Users - {selectedQueue?.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label>Assign Users to Queue</Label>
+                            <div className="border rounded-md p-4 max-h-96 overflow-y-auto">
+                                {availableUsers.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No users available</p>
+                                ) : (
+                                    <div className="grid gap-3">
+                                        {availableUsers.map((user) => (
+                                            <div key={user.id} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`user-${user.id}`}
+                                                    checked={selectedUserIds.includes(user.id)}
+                                                    onCheckedChange={(checked) =>
+                                                        handleUserToggle(user.id, checked as boolean)
+                                                    }
+                                                />
+                                                <label
+                                                    htmlFor={`user-${user.id}`}
+                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        {user.avatar && (
+                                                            <img
+                                                                src={user.avatar}
+                                                                alt={user.name}
+                                                                className="h-6 w-6 rounded-full"
+                                                            />
+                                                        )}
+                                                        <div>
+                                                            <div>{user.name}</div>
+                                                            <div className="text-xs text-muted-foreground">{user.email}</div>
+                                                        </div>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Selected: {selectedUserIds.length} user{selectedUserIds.length !== 1 ? 's' : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsManageUsersDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleAssignUsers}>Save Assignments</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

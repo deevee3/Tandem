@@ -17,6 +17,8 @@ beforeEach(function () {
 });
 
 it('caches permissions per guard and invalidates on changes', function () {
+    $initialCount = Permission::allCached()->count();
+
     Permission::query()->create([
         'name' => 'View Dashboard',
         'slug' => 'dashboard.view',
@@ -29,8 +31,7 @@ it('caches permissions per guard and invalidates on changes', function () {
         'guard_name' => 'web',
     ]);
 
-    expect(Permission::allCached())->toHaveCount(2);
-    expect(Permission::allCached())->toHaveCount(2);
+    expect(Permission::allCached())->toHaveCount($initialCount + 2);
 
     Permission::query()->create([
         'name' => 'Manage Queues',
@@ -38,15 +39,18 @@ it('caches permissions per guard and invalidates on changes', function () {
         'guard_name' => 'web',
     ]);
 
-    expect(Permission::allCached())->toHaveCount(3);
+    expect(Permission::allCached())->toHaveCount($initialCount + 3);
 
     Permission::flushCache();
 
-    expect(Permission::allCached())->toHaveCount(3);
+    expect(Permission::allCached())->toHaveCount($initialCount + 3);
 });
 
 it('honors guard-specific permission lookups', function () {
     config(['auth.guards.api' => ['driver' => 'session', 'provider' => 'users']]);
+
+    $initialApiCount = Permission::allCached('api')->count();
+    $initialWebCount = Permission::allCached('web')->count();
 
     Permission::query()->create([
         'name' => 'API Metric View',
@@ -60,6 +64,6 @@ it('honors guard-specific permission lookups', function () {
         'guard_name' => 'web',
     ]);
 
-    expect(Permission::allCached('api'))->toHaveCount(1);
-    expect(Permission::allCached('web'))->toHaveCount(1);
+    expect(Permission::allCached('api'))->toHaveCount($initialApiCount + 1);
+    expect(Permission::allCached('web'))->toHaveCount($initialWebCount + 1);
 });

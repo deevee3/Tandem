@@ -21,3 +21,8 @@ Route::middleware(['auth.apikey'])->group(function () {
     Route::post('/assignments/{assignment}/release', [AssignmentController::class, 'release']);
     Route::post('/assignments/{assignment}/resolve', [AssignmentController::class, 'resolve']);
 });
+
+// Routes requiring authenticated user (human agent)
+Route::middleware(['auth'])->group(function () {
+    Route::post('/conversations/{conversation}/human-messages', [ConversationMessageController::class, 'storeHumanMessage']);
+});

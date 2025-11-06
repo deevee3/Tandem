@@ -9,6 +9,8 @@ final class Permissions
     public const QUEUES_MANAGE = 'queues.manage';
     public const CONVERSATIONS_REVIEW = 'conversations.review';
     public const GUARDRAILS_ADJUST = 'guardrails.adjust';
+    public const API_KEYS_MANAGE = 'api-keys.manage';
+    public const WEBHOOKS_MANAGE = 'webhooks.manage';
 
     /**
      * @return list<string>
@@ -21,6 +23,8 @@ final class Permissions
             self::QUEUES_MANAGE,
             self::CONVERSATIONS_REVIEW,
             self::GUARDRAILS_ADJUST,
+            self::API_KEYS_MANAGE,
+            self::WEBHOOKS_MANAGE,
         ];
     }
 }

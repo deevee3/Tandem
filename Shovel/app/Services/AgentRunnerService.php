@@ -53,9 +53,9 @@ class AgentRunnerService
         return [
             'model' => $this->model(),
             'messages' => $this->promptBuilder->build($conversation),
-            'response_format' => [
-                'type' => 'json_schema',
-                'json_schema' => [
+            'text' => [
+                'format' => [
+                    'type' => 'json_schema',
                     'name' => 'agent_response',
                     'schema' => [
                         'type' => 'object',
@@ -68,6 +68,7 @@ class AgentRunnerService
                             'policy_flags' => ['type' => 'array', 'items' => ['type' => 'string']],
                         ],
                     ],
+                    'strict' => true,
                 ],
             ],
         ];

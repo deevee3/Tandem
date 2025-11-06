@@ -18,7 +18,7 @@ class QueueController extends Controller
         $perPage = $request->input('per_page', 50);
         $search = $request->input('search');
 
-        $query = Queue::query();
+        $query = Queue::query()->with('users');
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -67,6 +67,8 @@ class QueueController extends Controller
             'slug' => ['nullable', 'string', 'max:255', 'unique:queues'],
             'description' => ['nullable', 'string'],
             'is_default' => ['nullable', 'boolean'],
+            'sla_first_response_minutes' => ['nullable', 'integer', 'min:1'],
+            'sla_resolution_minutes' => ['nullable', 'integer', 'min:1'],
             'skills_required' => ['nullable', 'array'],
             'skills_required.*' => ['integer', 'exists:skills,id'],
             'priority_policy' => ['nullable', 'array'],
@@ -91,6 +93,8 @@ class QueueController extends Controller
             'slug' => $validated['slug'] ?? Str::slug($validated['name']),
             'description' => $validated['description'] ?? null,
             'is_default' => $validated['is_default'] ?? false,
+            'sla_first_response_minutes' => $validated['sla_first_response_minutes'] ?? 15,
+            'sla_resolution_minutes' => $validated['sla_resolution_minutes'] ?? 120,
             'skills_required' => $validated['skills_required'] ?? null,
             'priority_policy' => $validated['priority_policy'] ?? null,
         ]);
@@ -114,6 +118,8 @@ class QueueController extends Controller
             'slug' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('queues')->ignore($queue->id)],
             'description' => ['nullable', 'string'],
             'is_default' => ['nullable', 'boolean'],
+            'sla_first_response_minutes' => ['nullable', 'integer', 'min:1'],
+            'sla_resolution_minutes' => ['nullable', 'integer', 'min:1'],
             'skills_required' => ['nullable', 'array'],
             'skills_required.*' => ['integer', 'exists:skills,id'],
             'priority_policy' => ['nullable', 'array'],
@@ -155,6 +161,14 @@ class QueueController extends Controller
             $queue->skills_required = $validated['skills_required'];
         }
 
+        if (isset($validated['sla_first_response_minutes'])) {
+            $queue->sla_first_response_minutes = $validated['sla_first_response_minutes'];
+        }
+
+        if (isset($validated['sla_resolution_minutes'])) {
+            $queue->sla_resolution_minutes = $validated['sla_resolution_minutes'];
+        }
+
         if (isset($validated['priority_policy'])) {
             $queue->priority_policy = $validated['priority_policy'];
         }
@@ -179,6 +193,40 @@ class QueueController extends Controller
 
         return response()->json([
             'message' => 'Queue deleted successfully',
+        ], 200);
+    }
+
+    public function assignUsers(Request $request, Queue $queue): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'user_ids' => ['required', 'array'],
+            'user_ids.*' => ['integer', 'exists:users,id'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+
+        // Sync users to the queue (replaces existing assignments)
+        $queue->users()->sync($validated['user_ids']);
+
+        return response()->json([
+            'message' => 'Users assigned successfully',
+            'queue' => QueueResource::make($queue->load('users')),
+        ], 200);
+    }
+
+    public function unassignUser(Queue $queue, int $userId): JsonResponse
+    {
+        $queue->users()->detach($userId);
+
+        return response()->json([
+            'message' => 'User unassigned successfully',
         ], 200);
     }
 }

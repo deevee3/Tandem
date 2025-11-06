@@ -15,9 +15,14 @@ class Skill extends Model
     protected static function booted(): void
     {
         static::creating(function (self $skill): void {
-            // Auto-generate code if not provided
-            if (blank($skill->code)) {
+            // Auto-generate code if not provided and column exists
+            if (blank($skill->code) && \Illuminate\Support\Facades\Schema::hasColumn('skills', 'code')) {
                 $skill->code = self::generateCode();
+            }
+            
+            // Auto-generate slug if not provided and column exists
+            if (blank($skill->slug) && \Illuminate\Support\Facades\Schema::hasColumn('skills', 'slug')) {
+                $skill->slug = \Illuminate\Support\Str::slug($skill->name);
             }
         });
     }

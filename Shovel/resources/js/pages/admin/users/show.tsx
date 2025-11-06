@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AdminLayout from '@/layouts/admin-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Mail, Calendar, Shield, Award, Upload, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Mail, Calendar, Shield, Award, Upload, Copy, Check, DollarSign, Clock, CheckCircle } from 'lucide-react';
 import { dashboard } from '@/routes';
 import admin from '@/routes/admin';
 import axios from 'axios';
@@ -40,6 +40,16 @@ interface User {
     }>;
 }
 
+interface ResourceMetrics {
+    total_hourly_rate: number;
+    role_hourly_rate: number;
+    skill_hourly_rate: number;
+    total_assignments: number;
+    active_assignments: number;
+    resolved_assignments: number;
+    avg_resolution_time_minutes: number | null;
+}
+
 interface Props {
     user: User;
 }
@@ -49,6 +59,8 @@ export default function UserShow({ user: initialUser }: Props) {
     const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
     const [avatarUrl, setAvatarUrl] = useState('');
     const [copied, setCopied] = useState(false);
+    const [resourceMetrics, setResourceMetrics] = useState<ResourceMetrics | null>(null);
+    const [loadingMetrics, setLoadingMetrics] = useState(true);
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
@@ -104,6 +116,21 @@ export default function UserShow({ user: initialUser }: Props) {
             day: 'numeric',
         });
     };
+
+    useEffect(() => {
+        const fetchResourceMetrics = async () => {
+            try {
+                const response = await axios.get(`/admin/api/users/${user.id}/resource-management`);
+                setResourceMetrics(response.data.data.resource_metrics);
+            } catch (error) {
+                console.error('Failed to fetch resource metrics:', error);
+            } finally {
+                setLoadingMetrics(false);
+            }
+        };
+
+        fetchResourceMetrics();
+    }, [user.id]);
 
     return (
         <AdminLayout breadcrumbs={breadcrumbs}>
@@ -288,6 +315,87 @@ export default function UserShow({ user: initialUser }: Props) {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Resource Management Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Resource Management</CardTitle>
+                        <CardDescription>Hourly rates and assignment statistics</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {loadingMetrics ? (
+                            <div className="text-center py-8 text-muted-foreground">Loading metrics...</div>
+                        ) : resourceMetrics ? (
+                            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                                {/* Total Hourly Rate */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <DollarSign className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Total Hourly Rate</span>
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        ${resourceMetrics.total_hourly_rate.toFixed(2)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground space-y-1">
+                                        <div>Roles: ${resourceMetrics.role_hourly_rate.toFixed(2)}</div>
+                                        <div>Skills: ${resourceMetrics.skill_hourly_rate.toFixed(2)}</div>
+                                    </div>
+                                </div>
+
+                                {/* Total Assignments */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <CheckCircle className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Total Assignments</span>
+                                    </div>
+                                    <div className="text-2xl font-bold">{resourceMetrics.total_assignments}</div>
+                                    <div className="text-xs text-muted-foreground space-y-1">
+                                        <div>Active: {resourceMetrics.active_assignments}</div>
+                                        <div>Resolved: {resourceMetrics.resolved_assignments}</div>
+                                    </div>
+                                </div>
+
+                                {/* Average Resolution Time */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <Clock className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Avg Resolution Time</span>
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {resourceMetrics.avg_resolution_time_minutes
+                                            ? `${resourceMetrics.avg_resolution_time_minutes.toFixed(0)}m`
+                                            : 'N/A'}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {resourceMetrics.avg_resolution_time_minutes
+                                            ? `${(resourceMetrics.avg_resolution_time_minutes / 60).toFixed(1)} hours`
+                                            : 'No resolved assignments'}
+                                    </div>
+                                </div>
+
+                                {/* Resolution Rate */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <Award className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Resolution Rate</span>
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {resourceMetrics.total_assignments > 0
+                                            ? `${((resourceMetrics.resolved_assignments / resourceMetrics.total_assignments) * 100).toFixed(0)}%`
+                                            : 'N/A'}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {resourceMetrics.resolved_assignments} of {resourceMetrics.total_assignments} resolved
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-muted-foreground">
+                                Failed to load resource metrics
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Update Avatar Dialog */}

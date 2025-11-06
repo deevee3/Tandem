@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\AppendHumanMessageRequest;
 use App\Http\Requests\Api\AppendRequesterMessageRequest;
 use App\Jobs\RunAgentForConversation;
 use App\Models\Conversation;
@@ -28,6 +29,28 @@ class ConversationMessageController extends Controller
         $conversation = $conversation->fresh(['messages']);
 
         $this->ensureAgentWorking($conversation);
+
+        return response()->json([
+            'data' => $conversation->toArray(),
+        ], 201);
+    }
+
+    public function storeHumanMessage(AppendHumanMessageRequest $request, Conversation $conversation): JsonResponse
+    {
+        $conversation = DB::transaction(function () use ($conversation, $request) {
+            $conversation->refresh();
+
+            // Create message with user_id from authenticated user
+            $conversation->messages()->create($request->messageAttributes());
+            
+            // Update conversation's last_activity_at
+            $conversation->last_activity_at = now();
+            $conversation->save();
+
+            return $conversation;
+        });
+
+        $conversation = $conversation->fresh(['messages.user', 'currentAssignment.user.roles', 'currentAssignment.user.skills']);
 
         return response()->json([
             'data' => $conversation->toArray(),

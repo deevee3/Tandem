@@ -22,7 +22,16 @@ class Conversation extends Model
     public const STATUS_RESOLVED = 'resolved';
     public const STATUS_ARCHIVED = 'archived';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'subject',
+        'status',
+        'priority',
+        'requester_type',
+        'requester_identifier',
+        'case_id',
+        'last_activity_at',
+        'metadata',
+    ];
 
     protected $casts = [
         'metadata' => 'array',
@@ -72,5 +81,10 @@ class Conversation extends Model
     public function evaluation(): HasOne
     {
         return $this->hasOne(Evaluation::class);
+    }
+
+    public function auditEvents(): HasMany
+    {
+        return $this->hasMany(AuditEvent::class);
     }
 }

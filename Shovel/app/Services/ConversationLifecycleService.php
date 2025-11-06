@@ -264,16 +264,101 @@ class ConversationLifecycleService
         $actorId = Arr::get($context, 'actor_id');
         $now = now();
 
+        // Enrich payload with user context (roles, skills, queue)
+        $enrichedPayload = array_merge([
+            'from' => $event->getState(),
+            'to' => Arr::get($event->getConfig(), 'to'),
+        ], array_filter($payload, fn ($value) => $value !== null));
+
+        // Add user context if actor is present
+        if ($actorId) {
+            $user = DB::table('users')->where('id', $actorId)->first();
+            if ($user) {
+                $enrichedPayload['actor'] = [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'username' => $user->username,
+                ];
+
+                // Add roles
+                $roles = DB::table('user_roles')
+                    ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+                    ->where('user_roles.user_id', $actorId)
+                    ->select('roles.id', 'roles.name', 'roles.slug', 'roles.code')
+                    ->get();
+                if ($roles->isNotEmpty()) {
+                    $enrichedPayload['actor']['roles'] = $roles->toArray();
+                }
+
+                // Add skills
+                $skills = DB::table('user_skill')
+                    ->join('skills', 'skills.id', '=', 'user_skill.skill_id')
+                    ->where('user_skill.user_id', $actorId)
+                    ->select('skills.id', 'skills.name', 'user_skill.level')
+                    ->get();
+                if ($skills->isNotEmpty()) {
+                    $enrichedPayload['actor']['skills'] = $skills->toArray();
+                }
+            }
+        }
+
+        // Add queue context if present
+        if (isset($payload['queue_id'])) {
+            $queue = DB::table('queues')->where('id', $payload['queue_id'])->first();
+            if ($queue) {
+                $enrichedPayload['queue'] = [
+                    'id' => $queue->id,
+                    'name' => $queue->name,
+                    'slug' => $queue->slug,
+                    'sla_first_response_minutes' => $queue->sla_first_response_minutes,
+                    'sla_resolution_minutes' => $queue->sla_resolution_minutes,
+                    'skills_required' => json_decode($queue->skills_required ?? '[]', true),
+                    'priority_policy' => json_decode($queue->priority_policy ?? '{}', true),
+                ];
+            }
+        }
+
+        // Add assigned user context if present
+        if (isset($payload['user_id']) && $payload['user_id'] !== $actorId) {
+            $assignedUser = DB::table('users')->where('id', $payload['user_id'])->first();
+            if ($assignedUser) {
+                $enrichedPayload['assigned_user'] = [
+                    'id' => $assignedUser->id,
+                    'name' => $assignedUser->name,
+                    'email' => $assignedUser->email,
+                    'username' => $assignedUser->username,
+                ];
+
+                // Add assigned user's roles
+                $assignedRoles = DB::table('user_roles')
+                    ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+                    ->where('user_roles.user_id', $payload['user_id'])
+                    ->select('roles.id', 'roles.name', 'roles.slug', 'roles.code')
+                    ->get();
+                if ($assignedRoles->isNotEmpty()) {
+                    $enrichedPayload['assigned_user']['roles'] = $assignedRoles->toArray();
+                }
+
+                // Add assigned user's skills
+                $assignedSkills = DB::table('user_skill')
+                    ->join('skills', 'skills.id', '=', 'user_skill.skill_id')
+                    ->where('user_skill.user_id', $payload['user_id'])
+                    ->select('skills.id', 'skills.name', 'user_skill.level')
+                    ->get();
+                if ($assignedSkills->isNotEmpty()) {
+                    $enrichedPayload['assigned_user']['skills'] = $assignedSkills->toArray();
+                }
+            }
+        }
+
         DB::table('audit_events')->insert([
             'event_type' => 'conversation.' . $event->getTransition(),
             'conversation_id' => $conversation->id,
             'user_id' => $actorId,
             'subject_type' => Conversation::class,
             'subject_id' => $conversation->id,
-            'payload' => json_encode(array_merge([
-                'from' => $event->getState(),
-                'to' => Arr::get($event->getConfig(), 'to'),
-            ], array_filter($payload, fn ($value) => $value !== null))),
+            'payload' => json_encode($enrichedPayload),
             'channel' => Arr::get($context, 'channel', 'system'),
             'occurred_at' => $this->resolveTimestamp($context, 'occurred_at', false) ?? $now,
             'created_at' => $now,

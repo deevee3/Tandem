@@ -26,11 +26,18 @@ class QueueItemController extends Controller
         $state = $validated['state'] ?? null;
 
         $query = $queue->items()
-            ->with(['conversation' => function ($conversationQuery) {
-                $conversationQuery->with(['messages' => function ($messageQuery) {
-                    $messageQuery->latest()->limit(1);
-                }]);
-            }])
+            ->with([
+                'queue.users',
+                'conversation' => function ($conversationQuery) {
+                    $conversationQuery->with([
+                        'messages' => function ($messageQuery) {
+                            $messageQuery->latest()->limit(1);
+                        },
+                        'currentAssignment.user.roles',
+                        'currentAssignment.user.skills',
+                    ]);
+                },
+            ])
             ->orderByDesc('enqueued_at');
 
         if ($state) {

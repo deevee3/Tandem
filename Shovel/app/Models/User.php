@@ -120,4 +120,20 @@ class User extends Authenticatable
             ->whereHas('permissions', fn ($query) => $query->where('slug', $permissionSlug))
             ->exists();
     }
+
+    /**
+     * @return BelongsToMany<Queue>
+     */
+    public function queues(): BelongsToMany
+    {
+        return $this->belongsToMany(Queue::class, 'queue_user')->withTimestamps();
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<Assignment>
+     */
+    public function assignments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Assignment::class);
+    }
 }

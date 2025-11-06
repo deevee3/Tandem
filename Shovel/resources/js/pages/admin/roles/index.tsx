@@ -84,6 +84,7 @@ export default function RolesIndex() {
     });
 
     const [formErrors, setFormErrors] = useState<Record<string, string[]>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchRoles = useCallback(async (page = 1, searchQuery = '') => {
         setLoading(true);
@@ -131,15 +132,22 @@ export default function RolesIndex() {
 
     const handleCreateRole = async () => {
         setFormErrors({});
+        setIsSubmitting(true);
         try {
+            console.log('Creating role with data:', formData);
             await axios.post('/admin/api/roles', formData);
             setIsCreateDialogOpen(false);
             setFormData({ name: '', slug: '', description: '', guard_name: 'web', hourly_rate: '', permission_ids: [] });
-            fetchRoles(pagination.current_page, search);
+            await fetchRoles(pagination.current_page, search);
         } catch (error: any) {
+            console.error('Error creating role:', error);
             if (error.response?.data?.errors) {
                 setFormErrors(error.response.data.errors);
+            } else {
+                alert(`Error: ${error.response?.data?.message || error.message || 'Unknown error occurred'}`);
             }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -147,16 +155,23 @@ export default function RolesIndex() {
         if (!selectedRole) return;
 
         setFormErrors({});
+        setIsSubmitting(true);
         try {
+            console.log('Updating role with data:', formData);
             await axios.put(`/admin/api/roles/${selectedRole.id}`, formData);
             setIsEditDialogOpen(false);
             setSelectedRole(null);
             setFormData({ name: '', slug: '', description: '', guard_name: 'web', hourly_rate: '', permission_ids: [] });
-            fetchRoles(pagination.current_page, search);
+            await fetchRoles(pagination.current_page, search);
         } catch (error: any) {
+            console.error('Error updating role:', error);
             if (error.response?.data?.errors) {
                 setFormErrors(error.response.data.errors);
+            } else {
+                alert(`Error: ${error.response?.data?.message || error.message || 'Unknown error occurred'}`);
             }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -462,10 +477,12 @@ export default function RolesIndex() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} disabled={isSubmitting}>
                             Cancel
                         </Button>
-                        <Button onClick={handleCreateRole}>Create Role</Button>
+                        <Button onClick={handleCreateRole} disabled={isSubmitting}>
+                            {isSubmitting ? 'Creating...' : 'Create Role'}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -578,10 +595,12 @@ export default function RolesIndex() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                        <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSubmitting}>
                             Cancel
                         </Button>
-                        <Button onClick={handleEditRole}>Save Changes</Button>
+                        <Button onClick={handleEditRole} disabled={isSubmitting}>
+                            {isSubmitting ? 'Saving...' : 'Save Changes'}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

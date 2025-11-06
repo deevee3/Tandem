@@ -205,4 +205,47 @@ class UserController extends Controller
             ->response()
             ->setStatusCode(200);
     }
+
+    public function resourceManagement(User $user): JsonResponse
+    {
+        $user->load(['roles', 'skills', 'queues']);
+
+        // Calculate total hourly rate from roles and skills
+        $roleHourlyRate = $user->roles->sum(function ($role) {
+            return $role->hourly_rate ?? 0;
+        });
+
+        $skillHourlyRate = $user->skills->sum(function ($skill) {
+            return $skill->hourly_rate ?? 0;
+        });
+
+        $totalHourlyRate = $roleHourlyRate + $skillHourlyRate;
+
+        // Get assignment statistics
+        $totalAssignments = $user->assignments()->count();
+        $activeAssignments = $user->assignments()->whereNull('released_at')->count();
+        $resolvedAssignments = $user->assignments()->whereNotNull('resolved_at')->count();
+
+        // Get average resolution time (in minutes)
+        $avgResolutionTime = $user->assignments()
+            ->whereNotNull('resolved_at')
+            ->whereNotNull('assigned_at')
+            ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, assigned_at, resolved_at)) as avg_time')
+            ->value('avg_time');
+
+        return response()->json([
+            'data' => [
+                'user' => UserResource::make($user)->resolve(),
+                'resource_metrics' => [
+                    'total_hourly_rate' => round($totalHourlyRate, 2),
+                    'role_hourly_rate' => round($roleHourlyRate, 2),
+                    'skill_hourly_rate' => round($skillHourlyRate, 2),
+                    'total_assignments' => $totalAssignments,
+                    'active_assignments' => $activeAssignments,
+                    'resolved_assignments' => $resolvedAssignments,
+                    'avg_resolution_time_minutes' => $avgResolutionTime ? round($avgResolutionTime, 2) : null,
+                ],
+            ],
+        ], 200);
+    }
 }

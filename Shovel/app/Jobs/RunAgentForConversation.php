@@ -9,6 +9,7 @@ use App\Services\AgentRunnerService;
 use App\Services\AgentRunResult;
 use App\Services\PolicyEvaluationResult;
 use App\Services\PolicyEvaluationService;
+use App\Services\QueueResolverService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -26,6 +27,8 @@ class RunAgentForConversation implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
+    private ?QueueResolverService $queueResolver = null;
+
     public function __construct(
         private readonly int $conversationId,
     ) {
@@ -36,8 +39,11 @@ class RunAgentForConversation implements ShouldQueue
         AgentRunnerService $runner,
         FactoryInterface $stateMachineFactory,
         PolicyEvaluationService $policyEvaluationService,
+        ?QueueResolverService $queueResolver = null,
     ): void
     {
+        $this->queueResolver = $queueResolver;
+
         $conversation = Conversation::with('messages')->find($this->conversationId);
 
         if (! $conversation) {
@@ -154,7 +160,7 @@ class RunAgentForConversation implements ShouldQueue
             $stateMachine = $stateMachineFactory->get($conversation, 'conversation');
         }
 
-        $queue = $this->resolveQueue();
+        $queue = $this->resolveQueue($evaluation, $conversation);
 
         if (! $queue) {
             Log::warning('Unable to resolve queue for agent handoff.', [
@@ -181,9 +187,13 @@ class RunAgentForConversation implements ShouldQueue
         }
     }
 
-    private function resolveQueue(): ?Queue
+    private function resolveQueue(PolicyEvaluationResult $evaluation, Conversation $conversation): ?Queue
     {
-        return Queue::where('is_default', true)->first()
-            ?? Queue::orderBy('id')->first();
+        if ($this->queueResolver === null) {
+            return Queue::where('is_default', true)->first()
+                ?? Queue::orderBy('id')->first();
+        }
+
+        return $this->queueResolver->resolveForEvaluation($evaluation, $conversation);
     }
 }

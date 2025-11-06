@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { BarChart3, FileText, Key, Shield, Sparkles, Users, Webhook } from 'luci
 import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes';
+import { useMemo } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -18,7 +19,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const adminSections = [
+const allAdminSections = [
     {
         title: 'Users & Roles',
         description: 'Manage users, roles, and permissions',
@@ -46,6 +47,7 @@ const adminSections = [
         icon: Key,
         href: '/admin/api-keys',
         color: 'text-yellow-600 dark:text-yellow-400',
+        requiresPermission: 'api-keys.manage',
     },
     {
         title: 'Webhooks',
@@ -71,6 +73,18 @@ const adminSections = [
 ];
 
 export default function AdminDashboard() {
+    const page = usePage<{ auth: { permissions?: string[] | null } }>();
+    const permissions = page.props.auth.permissions ?? [];
+
+    const adminSections = useMemo(() => {
+        return allAdminSections.filter(section => {
+            if (section.requiresPermission) {
+                return permissions.includes(section.requiresPermission);
+            }
+            return true;
+        });
+    }, [permissions]);
+
     return (
         <AdminLayout breadcrumbs={breadcrumbs}>
             <Head title="Admin Dashboard" />

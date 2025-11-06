@@ -15,6 +15,11 @@ class Role extends Model
     use HasFactory;
 
     protected $guarded = [];
+    
+    protected $casts = [
+        'guard_name' => 'string',
+        'hourly_rate' => 'decimal:2',
+    ];
 
     protected static function booted(): void
     {

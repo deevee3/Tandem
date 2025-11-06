@@ -15,7 +15,7 @@ class UserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
+        $data = [
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
@@ -48,5 +48,14 @@ class UserResource extends JsonResource
                 });
             }),
         ];
+
+        // Calculate total hourly rate when roles and skills are loaded
+        if ($this->relationLoaded('roles') && $this->relationLoaded('skills')) {
+            $roleHourlyRate = $this->roles->sum(fn($role) => $role->hourly_rate ?? 0);
+            $skillHourlyRate = $this->skills->sum(fn($skill) => $skill->hourly_rate ?? 0);
+            $data['total_hourly_rate'] = round($roleHourlyRate + $skillHourlyRate, 2);
+        }
+
+        return $data;
     }
 }

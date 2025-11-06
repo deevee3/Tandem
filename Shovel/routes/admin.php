@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Admin\HandoffPolicyController;
 use App\Http\Controllers\Admin\QueueController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SkillController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\WebhookController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\WorkOS\Http\Middleware\ValidateSessionWithWorkOS;
@@ -16,6 +18,10 @@ Route::middleware([
     Route::get('/', function () {
         return Inertia::render('admin/dashboard');
     })->name('dashboard');
+
+    Route::get('/api', function () {
+        return Inertia::render('admin/api/index');
+    })->name('api.index');
 
     // Users & Roles Management
     Route::get('/users', function () {
@@ -33,6 +39,7 @@ Route::middleware([
         Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
         Route::post('/{user}/skills', [UserController::class, 'syncSkills'])->name('sync-skills');
         Route::post('/{user}/avatar', [UserController::class, 'updateAvatar'])->name('update-avatar');
+        Route::get('/{user}/resource-management', [UserController::class, 'resourceManagement'])->name('resource-management');
     });
 
     Route::get('/roles', function () {
@@ -90,6 +97,8 @@ Route::middleware([
         Route::get('/{queue}', [QueueController::class, 'show'])->name('show');
         Route::put('/{queue}', [QueueController::class, 'update'])->name('update');
         Route::delete('/{queue}', [QueueController::class, 'destroy'])->name('destroy');
+        Route::post('/{queue}/users', [QueueController::class, 'assignUsers'])->name('assign-users');
+        Route::delete('/{queue}/users/{userId}', [QueueController::class, 'unassignUser'])->name('unassign-user');
     });
 
     // Handoff Policies Management
@@ -97,15 +106,42 @@ Route::middleware([
         return Inertia::render('admin/handoff-policies/index');
     })->name('handoff-policies.index');
 
+    Route::prefix('api/handoff-policies')->name('api.handoff-policies.')->group(function () {
+        Route::get('/', [HandoffPolicyController::class, 'index'])->name('index');
+        Route::post('/', [HandoffPolicyController::class, 'store'])->name('store');
+        Route::get('/{handoffPolicy}', [HandoffPolicyController::class, 'show'])->name('show');
+        Route::put('/{handoffPolicy}', [HandoffPolicyController::class, 'update'])->name('update');
+        Route::delete('/{handoffPolicy}', [HandoffPolicyController::class, 'destroy'])->name('destroy');
+    });
+
     // API Keys Management
-    Route::get('/api-keys', function () {
-        return Inertia::render('admin/api-keys/index');
-    })->name('api-keys.index');
+    Route::middleware('permission:api-keys.manage')->group(function () {
+        Route::get('/api-keys', function () {
+            return Inertia::render('admin/api-keys/index');
+        })->name('api-keys.index');
+
+        Route::prefix('api/api-keys')->name('api.api-keys.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\ApiKeyController::class, 'index'])->name('index');
+            Route::post('/', [\App\Http\Controllers\Admin\ApiKeyController::class, 'store'])->name('store');
+            Route::put('/{apiKey}', [\App\Http\Controllers\Admin\ApiKeyController::class, 'update'])->name('update');
+            Route::delete('/{apiKey}', [\App\Http\Controllers\Admin\ApiKeyController::class, 'destroy'])->name('destroy');
+        });
+    });
 
     // Webhooks Management
-    Route::get('/webhooks', function () {
-        return Inertia::render('admin/webhooks/index');
-    })->name('webhooks.index');
+    Route::middleware('permission:webhooks.manage')->group(function () {
+        Route::get('/webhooks', function () {
+            return Inertia::render('admin/webhooks/index');
+        })->name('webhooks.index');
+
+        Route::prefix('api/webhooks')->name('api.webhooks.')->group(function () {
+            Route::get('/', [WebhookController::class, 'index'])->name('index');
+            Route::post('/', [WebhookController::class, 'store'])->name('store');
+            Route::get('/{webhook}', [WebhookController::class, 'show'])->name('show');
+            Route::put('/{webhook}', [WebhookController::class, 'update'])->name('update');
+            Route::delete('/{webhook}', [WebhookController::class, 'destroy'])->name('destroy');
+        });
+    });
 
     // Analytics
     Route::get('/analytics', function () {

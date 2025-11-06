@@ -34,6 +34,7 @@ class CoreDatabaseSeeder extends Seeder
             ['name' => 'Manage Queues', 'slug' => 'queues.manage'],
             ['name' => 'Review Conversations', 'slug' => 'conversations.review'],
             ['name' => 'Adjust Guardrails', 'slug' => 'guardrails.adjust'],
+            ['name' => 'Manage API Keys', 'slug' => 'api-keys.manage'],
         ])->map(fn (array $permission) => array_merge($permission, [
             'guard_name' => 'web',
             'description' => null,

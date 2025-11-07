@@ -23,6 +23,7 @@ Route::middleware(['auth.apikey'])->group(function () {
 });
 
 // Routes requiring authenticated user (human agent)
-Route::middleware(['auth'])->group(function () {
+// Use 'web' middleware group to enable session support for authentication
+Route::middleware(['web', 'auth'])->group(function () {
     Route::post('/conversations/{conversation}/human-messages', [ConversationMessageController::class, 'storeHumanMessage']);
 });

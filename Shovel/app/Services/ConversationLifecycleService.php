@@ -12,11 +12,23 @@ use Sebdesign\SM\Event\TransitionEvent;
 
 class ConversationLifecycleService
 {
+    private SLAService $slaService;
+
+    public function __construct(SLAService $slaService)
+    {
+        $this->slaService = $slaService;
+    }
+
     public function afterAgentBegins(TransitionEvent $event): void
     {
         $conversation = $this->refreshConversation($event);
         $this->touchConversation($conversation, $event, $event->getContext());
         $this->recordAudit($conversation, $event);
+        
+        // Set SLA timers for new conversations
+        if (!$conversation->first_response_due_at) {
+            $this->slaService->setSLATimers($conversation);
+        }
     }
 
     public function afterHandoffRequired(TransitionEvent $event): void
@@ -152,7 +164,8 @@ class ConversationLifecycleService
             'user_id' => $userId,
         ]);
 
-        RunAgentForConversation::dispatch($conversation->id);
+        // Mark first response time when human accepts
+        $this->slaService->markFirstResponse($conversation);
     }
 
     public function afterReturnToAgent(TransitionEvent $event): void

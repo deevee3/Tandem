@@ -158,14 +158,34 @@ Audit log of all state changes and admin actions.
 PII masking rules: redact patterns before storage when enabled.
 Export and delete (right to be forgotten).
  Analytics and reporting
- Operational
-Handoff rate by reason and queue
-Time-to-first-response (agent), time-to-human, time-to-resolution
-SLA compliance by queue and priority
-Cost estimates per conversation (tokens, human minutes)
-Reopen rate, QA scores
- Exports: CSV/JSON by date range.
-Dashboards: daily/weekly charts; drill-down to conversations.
+
+ Objectives
+- Give Supervisors, Admins, and Compliance Officers fast visibility into conversation health, SLA risk, cost, and policy adherence.
+- Support daily operational standups (Supervisor focused), weekly business reviews (Admin + Leadership), and compliance audits.
+
+ Core dashboards (MVP)
+- **Operations overview:** Daily cards for open conversations, handoff count, SLA breaches, average wait times.
+- **Routing & handoff:** Charts for handoff volume by reason/queue, agent vs. human resolution paths, and top triggering policies.
+- **Responsiveness:** Time-to-first-response, time-to-human, and time-to-resolution percentiles with queue and priority filters.
+- **Quality & compliance:** QA sample pass rate, reopen rate, policy hits per 100 conversations, unresolved escalations.
+- **Cost insight:** Estimated token spend (LLM usage) and human handling minutes, with variance against baseline.
+
+ UX requirements
+- Filters: date range (default 7 days), queue, priority, policy reason, and agent/human owner.
+- Visualization: mix of trend lines, stacked bars, and KPI cards using existing admin dashboard layout components.
+- Drill-down: Clicking any chart segment opens filtered conversation list with transcript/audit quick links.
+- Export controls: CSV and JSON exports respect current filters and append metadata (generated_at, requesting_user).
+- Accessibility: Keyboard navigable, high-contrast color palette aligned with admin UI.
+
+ Data & performance
+- Aggregate queries run through AnalyticsService with caching (15-minute default) and per-tenant invalidation strategy.
+- All metrics scoped by organization/environment and respect RBAC; Supervisors see queues they manage, Admins see all.
+- Calculations sourced from conversations, handoffs, assignments, messages, SLA timers, QA evaluations, and audit logs.
+- Ensure background jobs update summary tables nightly to guarantee export speeds < 5 seconds for 90-day range.
+
+ Alerts & follow-up
+- Flag SLA breach spikes (>20% day-over-day) and policy hit anomalies via admin notifications feed.
+- Provide inline guidance links to relevant admin settings (queues, policies) when thresholds exceeded.
  Operational plan
  Deployment: Single container or VM. Persist storage/ directory for SQLite DB and logs.
 Backups: Snapshot database.sqlite every hour; daily retention 30 days.

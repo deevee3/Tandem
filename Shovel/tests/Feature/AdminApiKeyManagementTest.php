@@ -21,19 +21,17 @@ class AdminApiKeyManagementTest extends TestCase
     {
         parent::setUp();
 
-        $permission = Permission::query()->create([
-            'name' => 'Manage API Keys',
-            'slug' => 'api-keys.manage',
-            'guard_name' => 'web',
-        ]);
+        $permission = Permission::query()->firstOrCreate(
+            ['slug' => 'api-keys.manage', 'guard_name' => 'web'],
+            ['name' => 'Manage API Keys']
+        );
 
-        $role = Role::query()->create([
-            'name' => 'Administrator',
-            'slug' => 'administrator',
-            'guard_name' => 'web',
-        ]);
+        $role = Role::query()->firstOrCreate(
+            ['slug' => 'administrator', 'guard_name' => 'web'],
+            ['name' => 'Administrator']
+        );
 
-        $role->permissions()->attach($permission->id);
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
 
         $this->authorizedUser = User::factory()->create();
         $this->authorizedUser->roles()->attach($role->id);

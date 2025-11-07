@@ -32,7 +32,7 @@ class AgentRunnerService
         $payload = $this->buildPayload($conversation);
 
         try {
-            $response = $this->client->responses($payload);
+            $response = $this->client->chatCompletion($payload);
         } catch (ConnectionException|RequestException|RuntimeException $exception) {
             return AgentRunResult::failure($exception->getMessage());
         } catch (Throwable $exception) {
@@ -50,13 +50,16 @@ class AgentRunnerService
 
     protected function buildPayload(Conversation $conversation): array
     {
+        $messages = $this->promptBuilder->build($conversation);
+
         return [
             'model' => $this->model(),
-            'messages' => $this->promptBuilder->build($conversation),
-            'text' => [
-                'format' => [
-                    'type' => 'json_schema',
+            'messages' => $messages,
+            'response_format' => [
+                'type' => 'json_schema',
+                'json_schema' => [
                     'name' => 'agent_response',
+                    'strict' => true,
                     'schema' => [
                         'type' => 'object',
                         'required' => array_keys(self::OUTPUT_SCHEMA),
@@ -67,8 +70,8 @@ class AgentRunnerService
                             'reason' => ['type' => 'string'],
                             'policy_flags' => ['type' => 'array', 'items' => ['type' => 'string']],
                         ],
+                        'additionalProperties' => false,
                     ],
-                    'strict' => true,
                 ],
             ],
         ];
@@ -76,11 +79,7 @@ class AgentRunnerService
 
     protected function extractOutput(array $response): array
     {
-        $content = Arr::get($response, 'data.choices.0.message.content');
-
-        if (is_null($content)) {
-            $content = Arr::get($response, 'choices.0.message.content');
-        }
+        $content = Arr::get($response, 'choices.0.message.content');
 
         if (is_string($content)) {
             $decoded = json_decode($content, true);

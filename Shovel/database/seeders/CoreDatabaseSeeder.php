@@ -35,6 +35,8 @@ class CoreDatabaseSeeder extends Seeder
             ['name' => 'Review Conversations', 'slug' => 'conversations.review'],
             ['name' => 'Adjust Guardrails', 'slug' => 'guardrails.adjust'],
             ['name' => 'Manage API Keys', 'slug' => 'api-keys.manage'],
+            ['name' => 'Manage Webhooks', 'slug' => 'webhooks.manage'],
+            ['name' => 'View Audit Logs', 'slug' => 'audit-logs.view'],
         ])->map(fn (array $permission) => array_merge($permission, [
             'guard_name' => 'web',
             'description' => null,

@@ -138,6 +138,10 @@ When working with task lists, the AI must:
   - [ ] Build SLA compliance query (by queue, by priority)
   - [ ] Build cost estimation query (tokens + human minutes)
   - [ ] Build reopen rate query
+- [ ] Data orchestration
+  - [ ] Add nightly summary job for analytics aggregates with 90-day retention
+  - [ ] Implement cache invalidation hook when conversations/handoffs update
+  - [ ] Ensure metrics respect RBAC scope filtering (Supervisor vs Admin)
 - [ ] API Endpoints
   - [ ] Create analytics API controller
   - [ ] Add GET /api/analytics/handoff-rate endpoint
@@ -154,6 +158,10 @@ When working with task lists, the AI must:
   - [ ] Add cost summary cards
   - [ ] Add drill-down to conversations
   - [ ] Add date range picker
+- [ ] QA & monitoring
+  - [ ] Add feature tests validating analytics API respects filters and RBAC
+  - [ ] Add browser/E2E test covering dashboard filters and drill-down
+  - [ ] Add alert definitions for SLA breach spikes and policy anomalies
 
 #### FR-7: Conversation View Completion
 - [ ] Message Timeline

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api;
 
+use App\Models\Conversation;
 use App\Models\Message;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -31,6 +32,7 @@ class CreateConversationRequest extends FormRequest
         return [
             'subject' => $this->validated('subject'),
             'priority' => $this->validated('priority', 'standard'),
+            'status' => Conversation::STATUS_NEW,
             'requester_type' => $this->validated('requester.type'),
             'requester_identifier' => $this->validated('requester.identifier'),
             'case_id' => $this->validated('case_id'),

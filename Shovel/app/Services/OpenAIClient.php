@@ -7,14 +7,18 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class OpenAIClient
 {
-    public function responses(array $payload): array
+    public function chatCompletion(array $payload): array
     {
         try {
-            return $this->request()->post('responses', $payload)->throw()->json();
+            Log::debug('Dispatching OpenAI chat completion request.', [
+                'payload' => $payload,
+            ]);
+            return $this->request()->post('chat/completions', $payload)->throw()->json();
         } catch (ConnectionException|RequestException $exception) {
             throw $exception;
         }

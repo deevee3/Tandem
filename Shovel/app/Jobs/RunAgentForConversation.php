@@ -52,6 +52,7 @@ class RunAgentForConversation implements ShouldQueue
 
         $stateMachine = $stateMachineFactory->get($conversation, 'conversation');
 
+        // Handle both new conversations and conversations returned from human
         if ($conversation->status !== Conversation::STATUS_AGENT_WORKING && $stateMachine->can('agent_begins')) {
             $stateMachine->apply('agent_begins', false, [
                 'channel' => 'system',
@@ -62,11 +63,25 @@ class RunAgentForConversation implements ShouldQueue
             $stateMachine = $stateMachineFactory->get($conversation, 'conversation');
         }
 
+        // Ensure we're in agent_working state before proceeding
         if ($conversation->status !== Conversation::STATUS_AGENT_WORKING) {
+            Log::warning('Agent job cannot proceed - conversation not in agent_working state', [
+                'conversation_id' => $conversation->id,
+                'current_status' => $conversation->status,
+                'can_agent_begins' => $stateMachine->can('agent_begins'),
+            ]);
             return;
         }
 
         $result = $runner->run($conversation);
+
+        Log::debug('Agent run completed', [
+            'conversation_id' => $conversation->id,
+            'is_success' => $result->isSuccess(),
+            'is_failure' => $result->isFailure(),
+            'is_fallback' => $result->isFallback(),
+            'error' => $result->error(),
+        ]);
 
         if ($result->isFailure()) {
             throw new \RuntimeException($result->error() ?? 'Agent run failed.');

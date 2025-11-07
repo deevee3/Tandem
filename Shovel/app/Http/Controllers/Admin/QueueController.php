@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\QueueResource;
 use App\Models\Queue;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -13,6 +14,12 @@ use Illuminate\Validation\Rule;
 
 class QueueController extends Controller
 {
+    protected AuditLogService $auditLog;
+
+    public function __construct(AuditLogService $auditLog)
+    {
+        $this->auditLog = $auditLog;
+    }
     public function index(Request $request): JsonResponse
     {
         $perPage = $request->input('per_page', 50);
@@ -99,6 +106,8 @@ class QueueController extends Controller
             'priority_policy' => $validated['priority_policy'] ?? null,
         ]);
 
+        $this->auditLog->logResourceAction('queue', 'created', $queue);
+
         return QueueResource::make($queue)
             ->response()
             ->setStatusCode(201);
@@ -133,6 +142,8 @@ class QueueController extends Controller
         }
 
         $validated = $validator->validated();
+
+        $original = $queue->getOriginal();
 
         // If this queue is set as default, unset all other defaults
         if (isset($validated['is_default']) && $validated['is_default']) {
@@ -175,6 +186,18 @@ class QueueController extends Controller
 
         $queue->save();
 
+        $this->auditLog->logResourceAction('queue', 'updated', $queue, [
+            'changes' => $queue->getChanges(),
+            'original' => [
+                'name' => $original['name'] ?? null,
+                'slug' => $original['slug'] ?? null,
+                'description' => $original['description'] ?? null,
+                'is_default' => $original['is_default'] ?? null,
+                'sla_first_response_minutes' => $original['sla_first_response_minutes'] ?? null,
+                'sla_resolution_minutes' => $original['sla_resolution_minutes'] ?? null,
+            ],
+        ]);
+
         return QueueResource::make($queue)
             ->response()
             ->setStatusCode(200);
@@ -188,6 +211,8 @@ class QueueController extends Controller
                 'message' => 'Cannot delete the default queue',
             ], 422);
         }
+
+        $this->auditLog->logResourceAction('queue', 'deleted', $queue);
 
         $queue->delete();
 

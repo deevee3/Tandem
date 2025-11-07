@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AuditEventResource;
 use App\Models\AuditEvent;
+use Illuminate\Database\PostgresConnection;
+use Illuminate\Database\SQLiteConnection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class AuditLogController extends Controller
@@ -65,23 +66,35 @@ class AuditLogController extends Controller
             $escapedActor = addcslashes($actor, '%_');
             $like = "%{$escapedActor}%";
 
-            $query->where(function ($searchQuery) use ($like) {
-                $searchQuery->whereHas('user', function ($userQuery) use ($like) {
-                    $userQuery->where('name', 'like', $like)
-                        ->orWhere('email', 'like', $like)
-                        ->orWhere('username', 'like', $like);
+            $connection = $query->getConnection();
+            $isSqlite = $connection instanceof SQLiteConnection;
+            $isPostgres = $connection instanceof PostgresConnection;
+
+            $query->where(function ($searchQuery) use ($like, $isSqlite, $isPostgres) {
+                $searchQuery->whereHas('user', function ($userQuery) use ($like, $isPostgres) {
+                    if ($isPostgres) {
+                        $userQuery->where('name', 'ILIKE', $like)
+                            ->orWhere('email', 'ILIKE', $like)
+                            ->orWhere('username', 'ILIKE', $like);
+                    } else {
+                        $userQuery->where('name', 'like', $like)
+                            ->orWhere('email', 'like', $like)
+                            ->orWhere('username', 'like', $like);
+                    }
                 });
 
-                $driver = DB::connection()->getDriverName();
-
-                if ($driver === 'sqlite') {
+                if ($isSqlite) {
                     $searchQuery->orWhereRaw('JSON_EXTRACT(payload, ?) LIKE ?', ['$.actor.name', $like])
                         ->orWhereRaw('JSON_EXTRACT(payload, ?) LIKE ?', ['$.actor.email', $like])
                         ->orWhereRaw('JSON_EXTRACT(payload, ?) LIKE ?', ['$.actor.username', $like]);
+                } elseif ($isPostgres) {
+                    $searchQuery->orWhereRaw("(payload->'actor'->>'name') ILIKE ?", [$like])
+                        ->orWhereRaw("(payload->'actor'->>'email') ILIKE ?", [$like])
+                        ->orWhereRaw("(payload->'actor'->>'username') ILIKE ?", [$like]);
                 } else {
-                    $searchQuery->orWhereRaw('JSON_UNQUOTE(JSON_EXTRACT(payload, ?)) LIKE ?', ['$.actor.name', $like])
-                        ->orWhereRaw('JSON_UNQUOTE(JSON_EXTRACT(payload, ?)) LIKE ?', ['$.actor.email', $like])
-                        ->orWhereRaw('JSON_UNQUOTE(JSON_EXTRACT(payload, ?)) LIKE ?', ['$.actor.username', $like]);
+                    $searchQuery->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.actor.name')) LIKE ?", [$like])
+                        ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.actor.email')) LIKE ?", [$like])
+                        ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.actor.username')) LIKE ?", [$like]);
                 }
             });
         }

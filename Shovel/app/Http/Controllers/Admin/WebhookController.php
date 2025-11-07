@@ -7,16 +7,26 @@ use App\Http\Requests\Admin\StoreWebhookRequest;
 use App\Http\Requests\Admin\UpdateWebhookRequest;
 use App\Http\Resources\WebhookResource;
 use App\Models\Webhook;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class WebhookController extends Controller
 {
+    protected AuditLogService $auditLog;
+
+    public function __construct(AuditLogService $auditLog)
+    {
+        $this->auditLog = $auditLog;
+    }
     public function index(Request $request): JsonResponse
     {
         $perPage = max(1, min((int) $request->input('per_page', 50), 100));
@@ -87,6 +97,10 @@ class WebhookController extends Controller
             return Webhook::query()->create($payload);
         });
 
+        $this->auditLog->logResourceAction('webhook', 'created', $webhook, [
+            'events' => $webhook->events ?? [],
+        ]);
+
         return WebhookResource::make($webhook)
             ->additional([
                 'plain_text_secret' => $secret,
@@ -107,6 +121,7 @@ class WebhookController extends Controller
         $attributes = [];
         $plainSecret = null;
 
+        $original = $webhook->getOriginal();
         $validated = $request->validated();
 
         if (array_key_exists('name', $validated)) {
@@ -140,6 +155,16 @@ class WebhookController extends Controller
             $webhook->fill($attributes)->save();
         }
 
+        $this->auditLog->logResourceAction('webhook', 'updated', $webhook, [
+            'changes' => $webhook->getChanges(),
+            'original' => [
+                'name' => $original['name'] ?? null,
+                'url' => $original['url'] ?? null,
+                'active' => $original['active'] ?? null,
+            ],
+            'secret_rotated' => $plainSecret !== null,
+        ]);
+
         return WebhookResource::make($webhook->fresh())
             ->additional([
                 'plain_text_secret' => $plainSecret,
@@ -150,10 +175,92 @@ class WebhookController extends Controller
 
     public function destroy(Webhook $webhook): JsonResponse
     {
+        $this->auditLog->logResourceAction('webhook', 'deleted', $webhook);
+
         $webhook->delete();
 
         return response()->json([
             'message' => 'Webhook deleted successfully.',
+        ], 200);
+    }
+
+    public function test(Request $request, Webhook $webhook): JsonResponse
+    {
+        $validated = $request->validate([
+            'event' => ['required', 'string', 'max:255'],
+            'payload' => ['nullable', 'array'],
+        ]);
+
+        $event = trim((string) Arr::get($validated, 'event'));
+
+        if ($event === '') {
+            throw ValidationException::withMessages([
+                'event' => 'A valid event is required.',
+            ]);
+        }
+
+        $availableEvents = collect(Webhook::availableEvents());
+
+        if ($availableEvents->isNotEmpty() && ! $availableEvents->contains($event)) {
+            throw ValidationException::withMessages([
+                'event' => 'Select a valid event to test.',
+            ]);
+        }
+
+        try {
+            $secret = Crypt::decryptString($webhook->getAttribute('secret'));
+        } catch (Throwable) {
+            return response()->json([
+                'status' => null,
+                'successful' => false,
+                'error' => 'Unable to decrypt the webhook secret. Rotate the secret and try again.',
+            ], 422);
+        }
+
+        $payload = [
+            'id' => (string) Str::uuid(),
+            'event' => $event,
+            'timestamp' => now()->toIso8601String(),
+            'data' => Arr::get($validated, 'payload', []),
+            'webhook' => [
+                'id' => $webhook->id,
+                'name' => $webhook->name,
+                'url' => $webhook->url,
+            ],
+        ];
+
+        $encodedPayload = json_encode($payload);
+
+        if ($encodedPayload === false) {
+            throw ValidationException::withMessages([
+                'payload' => 'Unable to encode payload as JSON.',
+            ]);
+        }
+
+        $signature = 'sha256=' . hash_hmac('sha256', $encodedPayload, $secret);
+
+        try {
+            $response = Http::timeout(10)
+                ->withHeaders([
+                    'X-Webhook-Signature' => $signature,
+                    'X-Webhook-Event' => $event,
+                    'X-Webhook-Test' => 'true',
+                ])
+                ->post($webhook->url, $payload);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'status' => null,
+                'successful' => false,
+                'error' => $exception->getMessage(),
+            ], 502);
+        }
+
+        return response()->json([
+            'status' => $response->status(),
+            'successful' => $response->successful(),
+            'body' => $this->decodeResponseBody($response),
+            'headers' => $response->headers(),
+            'request_payload' => $payload,
         ], 200);
     }
 
@@ -172,5 +279,20 @@ class WebhookController extends Controller
     protected function generateSecret(): string
     {
         return 'whsk_' . Str::random(48);
+    }
+
+    protected function decodeResponseBody(Response $response): mixed
+    {
+        $contentType = strtolower($response->header('Content-Type') ?? '');
+
+        if ($contentType !== '' && str_contains($contentType, 'json')) {
+            $decoded = json_decode($response->body(), true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decoded;
+            }
+        }
+
+        return $response->body();
     }
 }

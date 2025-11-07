@@ -7,12 +7,19 @@ use App\Http\Requests\Admin\StoreApiKeyRequest;
 use App\Http\Requests\Admin\UpdateApiKeyRequest;
 use App\Http\Resources\ApiKeyResource;
 use App\Models\ApiKey;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class ApiKeyController extends Controller
 {
+    protected AuditLogService $auditLog;
+
+    public function __construct(AuditLogService $auditLog)
+    {
+        $this->auditLog = $auditLog;
+    }
     public function index(Request $request): JsonResponse
     {
         $perPage = max(1, min((int) $request->input('per_page', 50), 100));
@@ -74,6 +81,11 @@ class ApiKeyController extends Controller
         ]);
         $apiKey->setAttribute('plain_text_key', $plainTextKey);
 
+        $this->auditLog->logApiKeyAction('created', $apiKey, [
+            'expires_at' => $payload['expires_at'],
+            'user_id' => $payload['user_id'],
+        ]);
+
         return ApiKeyResource::make($apiKey->loadMissing('user'))
             ->additional([
                 'plain_text_key' => $plainTextKey,
@@ -84,8 +96,18 @@ class ApiKeyController extends Controller
 
     public function update(UpdateApiKeyRequest $request, ApiKey $apiKey): JsonResponse
     {
+        $original = $apiKey->getOriginal();
         $apiKey->fill($request->updatePayload());
         $apiKey->save();
+
+        $this->auditLog->logApiKeyAction('updated', $apiKey, [
+            'changes' => $apiKey->getChanges(),
+            'original' => [
+                'name' => $original['name'] ?? null,
+                'active' => $original['active'] ?? null,
+                'scopes' => $original['scopes'] ?? [],
+            ],
+        ]);
 
         return ApiKeyResource::make($apiKey->fresh('user'))
             ->response()
@@ -103,6 +125,8 @@ class ApiKeyController extends Controller
         $apiKey->forceFill([
             'active' => false,
         ])->save();
+
+        $this->auditLog->logApiKeyAction('deactivated', $apiKey);
 
         return response()->json([
             'message' => 'API key deactivated successfully.',

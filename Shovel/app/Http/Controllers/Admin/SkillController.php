@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SkillResource;
 use App\Models\Skill;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -14,6 +15,12 @@ use Inertia\Response;
 
 class SkillController extends Controller
 {
+    protected AuditLogService $auditLog;
+
+    public function __construct(AuditLogService $auditLog)
+    {
+        $this->auditLog = $auditLog;
+    }
     public function index(Request $request): JsonResponse
     {
         $perPage = $request->input('per_page', 50);
@@ -79,6 +86,8 @@ class SkillController extends Controller
 
         $skill = Skill::create($validated);
 
+        $this->auditLog->logResourceAction('skill', 'created', $skill);
+
         return SkillResource::make($skill)
             ->response()
             ->setStatusCode(201);
@@ -107,7 +116,16 @@ class SkillController extends Controller
 
         $validated = $validator->validated();
 
+        $original = $skill->getOriginal();
         $skill->update($validated);
+
+        $this->auditLog->logResourceAction('skill', 'updated', $skill, [
+            'changes' => $skill->getChanges(),
+            'original' => [
+                'name' => $original['name'] ?? null,
+                'description' => $original['description'] ?? null,
+            ],
+        ]);
 
         return SkillResource::make($skill)
             ->response()
@@ -125,6 +143,8 @@ class SkillController extends Controller
 
     public function destroy(Skill $skill): JsonResponse
     {
+        $this->auditLog->logResourceAction('skill', 'deleted', $skill);
+
         $skill->delete();
 
         return response()->json([

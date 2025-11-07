@@ -32,6 +32,8 @@ export function AdminSidebar() {
     const page = usePage<{ auth: { permissions?: string[] | null } }>();
     const permissions = page.props.auth.permissions ?? [];
     const canManageApiKeys = permissions.includes('api-keys.manage');
+    const canManageWebhooks = permissions.includes('webhooks.manage');
+    const canViewAuditLogs = permissions.includes('audit-logs.view');
 
     const mainNavItems: NavItem[] = useMemo(() => {
         const items: NavItem[] = [
@@ -93,26 +95,30 @@ export function AdminSidebar() {
 
         items.push(apiItems);
 
-        items.push(
-            {
+        if (canManageWebhooks) {
+            items.push({
                 title: 'Webhooks',
                 href: '/admin/webhooks',
                 icon: Webhook,
-            },
-            {
-                title: 'Analytics',
-                href: '/admin/analytics',
-                icon: BarChart3,
-            },
-            {
+            });
+        }
+
+        items.push({
+            title: 'Analytics',
+            href: '/admin/analytics',
+            icon: BarChart3,
+        });
+
+        if (canViewAuditLogs) {
+            items.push({
                 title: 'Audit Logs',
                 href: '/admin/audit-logs',
                 icon: FileText,
-            }
-        );
+            });
+        }
 
         return items;
-    }, [canManageApiKeys]);
+    }, [canManageApiKeys, canManageWebhooks, canViewAuditLogs]);
 
     return (
         <Sidebar collapsible="icon" variant="inset">

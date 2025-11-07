@@ -10,6 +10,13 @@ use Illuminate\Support\Collection;
 
 class PolicyEvaluationService
 {
+    private HandoffRulesService $handoffRulesService;
+
+    public function __construct(HandoffRulesService $handoffRulesService)
+    {
+        $this->handoffRulesService = $handoffRulesService;
+    }
+
     public function evaluateAgentResponse(Conversation $conversation, array $payload): PolicyEvaluationResult
     {
         $confidence = $this->normalizeConfidence(Arr::get($payload, 'confidence'));
@@ -19,13 +26,30 @@ class PolicyEvaluationService
         $handoffMetadata = Arr::get($payload, 'handoff_metadata', []);
         $toolError = (bool) Arr::get($payload, 'tool_error', false);
 
-        $policyMatch = $this->findBestPolicyMatch([
+        // Check new configurable handoff rules first
+        $evaluation = [
             'confidence' => $confidence,
             'policy_flags' => $policyFlags,
-            'agent_reason' => $agentReason,
+            'reason' => $agentReason,
             'handoff_requested' => $handoffRequested,
             'tool_error' => $toolError,
-        ]);
+        ];
+
+        $matchingRule = $this->handoffRulesService->getFirstMatchingRule($evaluation);
+        
+        if ($matchingRule) {
+            return new PolicyEvaluationResult(
+                shouldHandoff: true,
+                reason: $matchingRule->actions['reason_code'] ?? 'rule_matched',
+                confidence: $confidence,
+                policyHits: [['rule_id' => $matchingRule->id, 'rule_name' => $matchingRule->name]],
+                requiredSkills: $matchingRule->actions['required_skills'] ?? [],
+                metadata: array_merge($handoffMetadata, ['matched_rule' => $matchingRule->name])
+            );
+        }
+
+        // Fallback to legacy policy system
+        $policyMatch = $this->findBestPolicyMatch($evaluation);
 
         $policyHits = [];
         $requiredSkills = [];
@@ -110,7 +134,7 @@ class PolicyEvaluationService
                 }
             }
 
-            if ($bestMatch === null && $context['agent_reason'] === $policy->reason_code) {
+            if ($bestMatch === null && ($context['agent_reason'] ?? $context['reason']) === $policy->reason_code) {
                 $firstRule = $policy->rules->first();
 
                 if ($firstRule) {

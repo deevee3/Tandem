@@ -26,20 +26,18 @@ it('returns success when the OpenAI client yields valid agent output', function 
     $conversation = Conversation::factory()->create();
 
     $client = Mockery::mock(OpenAIClient::class);
-    $client->shouldReceive('responses')->once()->andReturn([
-        'data' => [
-            'choices' => [[
-                'message' => [
-                    'content' => json_encode([
-                        'response' => 'Summary goes here.',
-                        'confidence' => 0.88,
-                        'handoff' => false,
-                        'reason' => 'resolution',
-                        'policy_flags' => [],
-                    ]),
-                ],
-            ]],
-        ],
+    $client->shouldReceive('chatCompletion')->once()->andReturn([
+        'choices' => [[
+            'message' => [
+                'content' => json_encode([
+                    'response' => 'Summary goes here.',
+                    'confidence' => 0.88,
+                    'handoff' => false,
+                    'reason' => 'resolution',
+                    'policy_flags' => [],
+                ]),
+            ],
+        ]],
     ]);
 
     $service = makeAgentRunner($client);
@@ -61,17 +59,15 @@ it('falls back when the agent response violates the output schema', function () 
     $conversation = Conversation::factory()->create();
 
     $client = Mockery::mock(OpenAIClient::class);
-    $client->shouldReceive('responses')->once()->andReturn([
-        'data' => [
-            'choices' => [[
-                'message' => [
-                    'content' => json_encode([
-                        'confidence' => 0.2,
-                        'handoff' => true,
-                    ]),
-                ],
-            ]],
-        ],
+    $client->shouldReceive('chatCompletion')->once()->andReturn([
+        'choices' => [[
+            'message' => [
+                'content' => json_encode([
+                    'confidence' => 0.2,
+                    'handoff' => true,
+                ]),
+            ],
+        ]],
     ]);
 
     $service = makeAgentRunner($client);
@@ -86,7 +82,7 @@ it('returns failure when the OpenAI client throws an exception', function () {
     $conversation = Conversation::factory()->create();
 
     $client = Mockery::mock(OpenAIClient::class);
-    $client->shouldReceive('responses')->once()->andThrow(new RuntimeException('Connection lost.'));
+    $client->shouldReceive('chatCompletion')->once()->andThrow(new RuntimeException('Connection lost.'));
 
     $service = makeAgentRunner($client);
 

@@ -11,6 +11,7 @@ final class Permissions
     public const GUARDRAILS_ADJUST = 'guardrails.adjust';
     public const API_KEYS_MANAGE = 'api-keys.manage';
     public const WEBHOOKS_MANAGE = 'webhooks.manage';
+    public const AUDIT_LOGS_VIEW = 'audit-logs.view';
 
     /**
      * @return list<string>
@@ -25,6 +26,7 @@ final class Permissions
             self::GUARDRAILS_ADJUST,
             self::API_KEYS_MANAGE,
             self::WEBHOOKS_MANAGE,
+            self::AUDIT_LOGS_VIEW,
         ];
     }
 }

@@ -19,6 +19,14 @@ Shovel is a Laravel 11 application delivering the "Handshake" user experience: A
 - **Testing:** Pest (PHPUnit compatible) with focus on state transitions, services, and API endpoints
 - **Configuration pattern:** Environment-driven, sensitive values managed via `.env`
 
+### Core permissions matrix
+
+| Role | Permissions |
+| --- | --- |
+| Administrator | `dashboard.view`, `users.manage`, `queues.manage`, `conversations.review`, `guardrails.adjust`, `api-keys.manage`, `audit-logs.view` |
+| Supervisor | `dashboard.view`, `queues.manage`, `conversations.review` |
+| Human Agent | `dashboard.view`, `conversations.review` |
+
 ## Current functional coverage (Nov 2025)
 | Requirement | Status | Notes |
 | --- | --- | --- |

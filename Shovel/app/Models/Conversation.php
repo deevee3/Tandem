@@ -28,13 +28,25 @@ class Conversation extends Model
         'priority',
         'requester_type',
         'requester_identifier',
+        'requester_metadata',
         'case_id',
-        'last_activity_at',
         'metadata',
+        'first_response_due_at',
+        'resolution_due_at',
+        'first_responded_at',
+        'sla_breached_at',
+        'sla_status',
+        'last_activity_at',
     ];
 
     protected $casts = [
+        'requester_metadata' => 'array',
         'metadata' => 'array',
+        'sla_status' => 'array',
+        'first_response_due_at' => 'datetime',
+        'resolution_due_at' => 'datetime',
+        'first_responded_at' => 'datetime',
+        'sla_breached_at' => 'datetime',
         'last_activity_at' => 'datetime',
     ];
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\HandoffPolicyController;
 use App\Http\Controllers\Admin\QueueController;
 use App\Http\Controllers\Admin\RoleController;
@@ -140,6 +141,7 @@ Route::middleware([
             Route::get('/{webhook}', [WebhookController::class, 'show'])->name('show');
             Route::put('/{webhook}', [WebhookController::class, 'update'])->name('update');
             Route::delete('/{webhook}', [WebhookController::class, 'destroy'])->name('destroy');
+            Route::post('/{webhook}/test', [WebhookController::class, 'test'])->name('test');
         });
     });
 
@@ -148,8 +150,18 @@ Route::middleware([
         return Inertia::render('admin/analytics/index');
     })->name('analytics.index');
 
+    Route::prefix('api/analytics')->name('api.analytics.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\AnalyticsController::class, 'index'])->name('index');
+    });
+
     // Audit Logs
-    Route::get('/audit-logs', function () {
-        return Inertia::render('admin/audit-logs/index');
-    })->name('audit-logs.index');
+    Route::middleware('permission:audit-logs.view')->group(function () {
+        Route::get('/audit-logs', function () {
+            return Inertia::render('admin/audit-logs/index');
+        })->name('audit-logs.index');
+
+        Route::prefix('api/audit-logs')->name('api.audit-logs.')->group(function () {
+            Route::get('/', [AuditLogController::class, 'index'])->name('index');
+        });
+    });
 });

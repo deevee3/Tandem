@@ -100,6 +100,19 @@ class QueueItemController extends Controller
                 'channel' => 'api',
             ]);
 
+            // Auto-accept the assignment so user can immediately reply
+            $conversation->refresh();
+            $stateMachine = $this->stateMachineFactory->get($conversation, 'conversation');
+            
+            if ($stateMachine->can('human_accepts')) {
+                $stateMachine->apply('human_accepts', false, [
+                    'actor_id' => $request->actorId(),
+                    'assignment_user_id' => $request->assignmentUserId(),
+                    'accepted_at' => now(),
+                    'channel' => 'api',
+                ]);
+            }
+
             return $lockedQueueItem->fresh([
                 'conversation' => fn ($conversationQuery) => $conversationQuery->with([
                     'messages' => fn ($messageQuery) => $messageQuery->latest()->limit(1),

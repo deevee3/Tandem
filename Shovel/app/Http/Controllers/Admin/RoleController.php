@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RoleResource;
 use App\Models\Role;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -15,6 +16,12 @@ use Inertia\Response;
 
 class RoleController extends Controller
 {
+    protected AuditLogService $auditLog;
+
+    public function __construct(AuditLogService $auditLog)
+    {
+        $this->auditLog = $auditLog;
+    }
     public function index(Request $request): JsonResponse
     {
         $perPage = $request->input('per_page', 50);
@@ -98,6 +105,10 @@ class RoleController extends Controller
 
         $role->load(['permissions']);
 
+        $this->auditLog->logResourceAction('role', 'created', $role, [
+            'permission_ids' => $validated['permission_ids'] ?? [],
+        ]);
+
         return RoleResource::make($role)
             ->response()
             ->setStatusCode(201);
@@ -133,6 +144,8 @@ class RoleController extends Controller
 
         $validated = $validator->validated();
 
+        $original = $role->getOriginal();
+
         if (isset($validated['name'])) {
             $role->name = $validated['name'];
         }
@@ -161,6 +174,17 @@ class RoleController extends Controller
 
         $role->load(['permissions']);
 
+        $this->auditLog->logResourceAction('role', 'updated', $role, [
+            'changes' => $role->getChanges(),
+            'original' => [
+                'name' => $original['name'] ?? null,
+                'slug' => $original['slug'] ?? null,
+                'description' => $original['description'] ?? null,
+                'hourly_rate' => $original['hourly_rate'] ?? null,
+            ],
+            'permission_ids' => $validated['permission_ids'] ?? null,
+        ]);
+
         return RoleResource::make($role)
             ->response()
             ->setStatusCode(200);
@@ -177,6 +201,8 @@ class RoleController extends Controller
 
     public function destroy(Role $role): JsonResponse
     {
+        $this->auditLog->logResourceAction('role', 'deleted', $role);
+
         $role->delete();
 
         return response()->json([

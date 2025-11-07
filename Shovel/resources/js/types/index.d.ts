@@ -150,6 +150,50 @@ export interface ConversationAuditEvent {
     } | null;
 }
 
+export interface AuditEventUserSummary {
+    id: number;
+    name: string | null;
+    email: string | null;
+    username: string | null;
+}
+
+export interface AuditEventRecord {
+    id: number;
+    event_type: string;
+    conversation_id: number | null;
+    user_id: number | null;
+    user: AuditEventUserSummary | null;
+    subject_type: string | null;
+    subject_id: number | null;
+    subject?: {
+        type: string;
+        id: number;
+    } | null;
+    payload: Record<string, unknown> | null;
+    channel: string | null;
+    occurred_at: string | null;
+    created_at: string | null;
+}
+
+export interface PaginatedAuditEventResponse {
+    data: AuditEventRecord[];
+    meta: {
+        filters: {
+            conversation_id: number | null;
+            event_type: string | null;
+            occurred_from: string | null;
+            occurred_to: string | null;
+            actor: string | null;
+        };
+        pagination: {
+            current_page: number;
+            per_page: number;
+            total: number;
+            last_page: number;
+        };
+    };
+}
+
 export interface PaginatedQueueItemsResponse {
     data: QueueItemPayload[];
     meta: {
@@ -216,6 +260,38 @@ export interface PaginatedApiKeyResponse {
         };
     };
     plain_text_key?: string;
+}
+
+export interface Webhook {
+    id: number;
+    name: string;
+    url: string;
+    events: string[];
+    active: boolean;
+    metadata: Record<string, unknown> | null;
+    secret_last_four?: string | null;
+    masked_secret?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface PaginatedWebhookResponse {
+    data: Webhook[];
+    meta: {
+        pagination: {
+            current_page: number;
+            per_page: number;
+            total: number;
+            last_page: number;
+        };
+        filters: {
+            search: string | null;
+            active: boolean | null;
+            event: string | null;
+        };
+        available_events: string[];
+    };
+    plain_text_secret?: string | null;
 }
 
 declare module '*.png' {

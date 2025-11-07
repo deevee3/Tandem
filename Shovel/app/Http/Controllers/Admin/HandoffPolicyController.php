@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\UpdateHandoffPolicyRequest;
 use App\Http\Resources\HandoffPolicyResource;
 use App\Models\HandoffPolicy;
 use App\Models\HandoffPolicyRule;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -15,6 +16,12 @@ use Illuminate\Support\Facades\DB;
 
 class HandoffPolicyController extends Controller
 {
+    protected AuditLogService $auditLog;
+
+    public function __construct(AuditLogService $auditLog)
+    {
+        $this->auditLog = $auditLog;
+    }
     public function index(Request $request): JsonResponse
     {
         $perPage = (int) $request->input('per_page', 50);
@@ -76,6 +83,11 @@ class HandoffPolicyController extends Controller
 
         $policy->load(['skills', 'rules' => fn ($query) => $query->orderByDesc('priority')]);
 
+        $this->auditLog->logResourceAction('handoff_policy', 'created', $policy, [
+            'skill_ids' => $request->skillIds(),
+            'rules_count' => count($request->rulePayloads()),
+        ]);
+
         return HandoffPolicyResource::make($policy)
             ->response()
             ->setStatusCode(201);
@@ -92,6 +104,8 @@ class HandoffPolicyController extends Controller
 
     public function update(UpdateHandoffPolicyRequest $request, HandoffPolicy $handoffPolicy): JsonResponse
     {
+        $original = $handoffPolicy->getOriginal();
+
         DB::transaction(function () use ($request, $handoffPolicy) {
             $attributes = $request->policyAttributes();
 
@@ -111,6 +125,15 @@ class HandoffPolicyController extends Controller
 
         $handoffPolicy->load(['skills', 'rules' => fn ($query) => $query->orderByDesc('priority')]);
 
+        $this->auditLog->logResourceAction('handoff_policy', 'updated', $handoffPolicy, [
+            'changes' => $handoffPolicy->getChanges(),
+            'original' => [
+                'name' => $original['name'] ?? null,
+                'reason_code' => $original['reason_code'] ?? null,
+                'active' => $original['active'] ?? null,
+            ],
+        ]);
+
         return HandoffPolicyResource::make($handoffPolicy)
             ->response()
             ->setStatusCode(200);
@@ -118,6 +141,8 @@ class HandoffPolicyController extends Controller
 
     public function destroy(HandoffPolicy $handoffPolicy): JsonResponse
     {
+        $this->auditLog->logResourceAction('handoff_policy', 'deleted', $handoffPolicy);
+
         $handoffPolicy->delete();
 
         return response()->json([

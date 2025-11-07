@@ -49,6 +49,17 @@ export default function ConversationPage() {
     const canReturnToAgent = conversation.status === 'human_working' && Boolean(activeAssignment);
     const canResolve = conversation.status === 'human_working' || conversation.status === 'agent_working';
 
+    const canReply = useMemo(() => {
+        // Must have active assignment
+        if (!activeAssignment) return false;
+        
+        // Must be in human_working status
+        if (conversation.status !== 'human_working') return false;
+        
+        // User must be assigned to this conversation
+        return activeAssignment.user?.id === authenticatedUserId;
+    }, [activeAssignment, conversation.status, authenticatedUserId]);
+
     const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
     const [releaseActorId, setReleaseActorId] = useState(defaultActorId);
     const [releaseReason, setReleaseReason] = useState('');
@@ -60,6 +71,10 @@ export default function ConversationPage() {
     const [resolveSummary, setResolveSummary] = useState('');
     const [resolveSubmitting, setResolveSubmitting] = useState(false);
     const [resolveError, setResolveError] = useState<string | null>(null);
+
+    const [messageContent, setMessageContent] = useState('');
+    const [messageSending, setMessageSending] = useState(false);
+    const [messageError, setMessageError] = useState<string | null>(null);
 
     const resetReleaseForm = useCallback(() => {
         setReleaseActorId(defaultActorId);
@@ -177,6 +192,47 @@ export default function ConversationPage() {
         }
     }, [agentToken, conversation.id, refreshConversation, resolveActorId, resolveSummary, resetResolveForm]);
 
+    const handleSendMessage = useCallback(async () => {
+        if (messageContent.trim() === '') {
+            setMessageError('Message content cannot be empty.');
+            return;
+        }
+
+        setMessageSending(true);
+        setMessageError(null);
+
+        try {
+            const route = Api.ConversationMessageController.storeHumanMessage({ 
+                conversation: conversation.id 
+            });
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            
+            const response = await fetch(route.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken || '',
+                },
+                credentials: 'include',
+                body: JSON.stringify({ content: messageContent.trim() }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data?.message ?? 'Failed to send message.');
+            }
+
+            setMessageContent('');
+            await refreshConversation();
+        } catch (error) {
+            setMessageError((error as Error).message);
+        } finally {
+            setMessageSending(false);
+        }
+    }, [conversation.id, messageContent, refreshConversation]);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={conversation.subject ?? 'Conversation'} />
@@ -252,6 +308,37 @@ export default function ConversationPage() {
                                 ))
                             )}
                         </div>
+
+                        {canReply && (
+                            <div className="mt-4 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+                                <label htmlFor="message-input" className="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                    Reply to Customer
+                                </label>
+                                <textarea
+                                    id="message-input"
+                                    value={messageContent}
+                                    onChange={(e) => setMessageContent(e.target.value)}
+                                    placeholder="Type your reply to the customer..."
+                                    className="w-full rounded-lg border border-neutral-300 bg-white p-3 text-sm text-neutral-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:border-blue-400"
+                                    rows={4}
+                                    disabled={messageSending}
+                                />
+                                <div className="mt-3 flex items-center justify-between">
+                                    <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                        {messageContent.length} character{messageContent.length !== 1 ? 's' : ''}
+                                    </span>
+                                    <Button 
+                                        onClick={handleSendMessage}
+                                        disabled={messageSending || !messageContent.trim()}
+                                    >
+                                        {messageSending ? 'Sending...' : 'Send Reply'}
+                                    </Button>
+                                </div>
+                                {messageError && (
+                                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">{messageError}</p>
+                                )}
+                            </div>
+                        )}
                     </section>
 
                     <aside className="flex flex-col gap-4">

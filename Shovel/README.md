@@ -1,7 +1,7 @@
-# Shovel Platform
+# TANDEM
 
 ## Overview
-Shovel is a Laravel 11 application delivering the "Handshake" user experience: AI conversations escalate to human agents exactly when judgment matters. An embedded SQLite database keeps all customer data inside the app while enabling a clear upgrade path to Postgres.
+TANDEM is a Laravel 11 application delivering the "Handshake" user experience: AI conversations escalate to human agents exactly when judgment matters. An embedded SQLite database keeps all customer data inside the app while enabling a clear upgrade path to Postgres.
 
 ### MVP outcomes
 - Faster resolutions at lower cost with auditable handoffs
